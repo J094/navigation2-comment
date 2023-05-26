@@ -144,13 +144,20 @@ install(DIRECTORY include/
 
 install(DIRECTORY launch DESTINATION share/${PROJECT_NAME})
 
+# 这里编译测试的部分
 if(BUILD_TESTING)
+  # lint 就是检查代码错误, 风格和格式问题的过程
+  # ament_lint_auto 提供一种根据软件包的测试依赖项运行 linters 的方法
+  # ament_lint 用于对 ros2 软件包进行 linting 任务
   find_package(ament_lint_auto REQUIRED)
   # the following line skips the linter which checks for copyrights
   set(ament_cmake_copyright_FOUND TRUE)
   ament_lint_auto_find_test_dependencies()
 
+  # 提供了 gtest 框架为 ros2 软件包编写和运行测试的方法
+  # ament_cmake 用于增强 cmake 并为软件包作者增加便利功能的脚本
   find_package(ament_cmake_gtest REQUIRED)
+  # 将 test 目录添加为编译的目标
   add_subdirectory(test)
 endif()
 

@@ -1,5 +1,6 @@
 include_directories(${PROJECT_SOURCE_DIR}/test)
 
+# map_io 内部定义函数的单元测试
 # map_io unit test
 ament_add_gtest(test_map_io test_map_io.cpp ${PROJECT_SOURCE_DIR}/test/test_constants.cpp)
 
@@ -10,6 +11,7 @@ target_link_libraries(test_map_io
   stdc++fs
 )
 
+# costmap_filter_info_server 内部定义函数的单元测试
 # costmap_filter_info_server unit test
 ament_add_gtest(test_costmap_filter_info_server
   test_costmap_filter_info_server.cpp
