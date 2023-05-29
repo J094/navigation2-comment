@@ -105,6 +105,7 @@ rclcpp::Node::SharedPtr MapSaverTestFixture::node_ = nullptr;
 std::shared_ptr<nav2_util::LifecycleServiceClient> MapSaverTestFixture::lifecycle_client_ =
   nullptr;
 
+// 测试发送保存地图请求
 // Send map saving service request.
 // Load saved map and verify obtained OccupancyGrid.
 TEST_F(MapSaverTestFixture, SaveMap)
@@ -134,6 +135,7 @@ TEST_F(MapSaverTestFixture, SaveMap)
   verifyMapMsg(map_msg);
 }
 
+// 默认参数发送保存地图请求
 // Send map saving service request with default parameters.
 // Load saved map and verify obtained OccupancyGrid.
 TEST_F(MapSaverTestFixture, SaveMapDefaultParameters)
@@ -163,6 +165,7 @@ TEST_F(MapSaverTestFixture, SaveMapDefaultParameters)
   verifyMapMsg(map_msg);
 }
 
+// 使用不同的参数发送保存地图请求
 // Send map saving service requests with different sets of parameters.
 // In case of map is expected to be saved correctly, load map from a saved
 // file and verify obtained OccupancyGrid.

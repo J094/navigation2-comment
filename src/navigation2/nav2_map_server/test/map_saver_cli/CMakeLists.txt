@@ -1,5 +1,6 @@
 include_directories(${PROJECT_SOURCE_DIR}/test)
 
+# 测试 map_saver CLI
 # map_saver CLI
 ament_add_gtest(test_map_saver_cli
   test_map_saver_cli.cpp

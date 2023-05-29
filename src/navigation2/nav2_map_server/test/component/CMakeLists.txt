@@ -1,5 +1,6 @@
 include_directories(${PROJECT_SOURCE_DIR}/test)
 
+# 地图服务器测试节点
 # map_server component test
 ament_add_gtest_executable(test_map_server_node
   test_map_server_node.cpp
@@ -11,6 +12,7 @@ target_link_libraries(test_map_server_node
   stdc++fs
 )
 
+# 添加和运行节点的 launch 文件
 ament_add_test(test_map_server_node
   GENERATE_RESULT_FOR_RETURN_CODE_ZERO
   COMMAND "${CMAKE_CURRENT_SOURCE_DIR}/test_map_server_launch.py"
@@ -21,6 +23,7 @@ ament_add_test(test_map_server_node
     TEST_EXECUTABLE=$<TARGET_FILE:test_map_server_node>
 )
 
+# 地图保存服务器测试节点
 # map_saver component test
 ament_add_gtest_executable(test_map_saver_node
   test_map_saver_node.cpp
@@ -33,6 +36,7 @@ target_link_libraries(test_map_saver_node
   stdc++fs
 )
 
+# 注意这里不是 add_gtest 而是 add_executable
 add_executable(test_map_saver_publisher
   test_map_saver_publisher.cpp
   ${PROJECT_SOURCE_DIR}/test/test_constants.cpp
@@ -43,6 +47,7 @@ target_link_libraries(test_map_saver_publisher
   stdc++fs
 )
 
+# 添加和运行节点的 launch 文件
 ament_add_test(test_map_saver_node
   GENERATE_RESULT_FOR_RETURN_CODE_ZERO
   COMMAND "${CMAKE_CURRENT_SOURCE_DIR}/test_map_saver_launch.py"

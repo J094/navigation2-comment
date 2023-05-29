@@ -169,6 +169,7 @@ LoadParameters loadMapYaml(const std::string & yaml_filename)
   return load_parameters;
 }
 
+// 读取地图，需要给定 LoadParameters
 void loadMapFromFile(
   const LoadParameters & load_parameters,
   nav_msgs::msg::OccupancyGrid & map)
@@ -178,6 +179,7 @@ void loadMapFromFile(
 
   std::cout << "[INFO] [map_io]: Loading image_file: " <<
     load_parameters.image_file_name << std::endl;
+  // 使用 Magick 读取图像文件
   Magick::Image img(load_parameters.image_file_name);
 
   // Copy the image data into the map structure
@@ -198,13 +200,16 @@ void loadMapFromFile(
     for (size_t x = 0; x < msg.info.width; x++) {
       auto pixel = img.pixelColor(x, y);
 
+      // 读取得到 R G B 三个 channels, 这里还是量化后的整数
       std::vector<Magick::Quantum> channels = {pixel.redQuantum(), pixel.greenQuantum(),
         pixel.blueQuantum()};
+      // img.matte() 检查读取的图像是否支持 alpha 通道
       if (load_parameters.mode == MapMode::Trinary && img.matte()) {
         // To preserve existing behavior, average in alpha with color channels in Trinary mode.
         // CAREFUL. alpha is inverted from what you might expect. High = transparent, low = opaque
         channels.push_back(MaxRGB - pixel.alphaQuantum());
       }
+      // 这里计算所有通道的平均值，即计算亮度
       double sum = 0;
       for (auto c : channels) {
         sum += c;
@@ -212,6 +217,7 @@ void loadMapFromFile(
       /// on a scale from 0.0 to 1.0 how bright is the pixel?
       double shade = Magick::ColorGray::scaleQuantumToDouble(sum / channels.size());
 
+      // negate 就是反过来的意思
       // If negate is true, we consider blacker pixels free, and whiter
       // pixels occupied. Otherwise, it's vice versa.
       /// on a scale from 0.0 to 1.0, how occupied is the map cell (before thresholding)?
@@ -236,12 +242,15 @@ void loadMapFromFile(
           } else if (occ < load_parameters.free_thresh) {
             map_cell = nav2_util::OCC_GRID_FREE;
           } else {
+            // right int of double
+            // 其余的按比例计算 0 - 100 的中间值
             map_cell = std::rint(
               (occ - load_parameters.free_thresh) /
               (load_parameters.occupied_thresh - load_parameters.free_thresh) * 100.0);
           }
           break;
         case MapMode::Raw: {
+            // 对于 threshold 外的值, 都作为 unknown
             double occ_percent = std::round(shade * 255);
             if (nav2_util::OCC_GRID_FREE <= occ_percent &&
               occ_percent <= nav2_util::OCC_GRID_OCCUPIED)
@@ -255,10 +264,12 @@ void loadMapFromFile(
         default:
           throw std::runtime_error("Invalid map mode");
       }
+      // 给地图数据赋值
       msg.data[msg.info.width * (msg.info.height - y - 1) + x] = map_cell;
     }
   }
 
+  // 对于不属于任何节点的函数, 在系统时间种发布
   // Since loadMapFromFile() does not belong to any node, publishing in a system time.
   rclcpp::Clock clock(RCL_SYSTEM_TIME);
   msg.info.map_load_time = clock.now();

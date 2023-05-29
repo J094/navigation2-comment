@@ -106,6 +106,7 @@ std::shared_ptr<nav2_util::LifecycleServiceClient> MapServerTestFixture::lifecyc
   nullptr;
 
 
+// 发送请求获取地图
 // Send map getting service request and verify obtained OccupancyGrid
 TEST_F(MapServerTestFixture, GetMap)
 {
@@ -122,6 +123,7 @@ TEST_F(MapServerTestFixture, GetMap)
   verifyMapMsg(resp->map);
 }
 
+// 发送请求加载地图
 // Send map loading service request and verify obtained OccupancyGrid
 TEST_F(MapServerTestFixture, LoadMap)
 {
@@ -140,6 +142,7 @@ TEST_F(MapServerTestFixture, LoadMap)
   verifyMapMsg(resp->map);
 }
 
+// 发送请求加载地图, 不声明地图地址
 // Send map loading service request without specifying which map to load
 TEST_F(MapServerTestFixture, LoadMapNull)
 {
@@ -158,6 +161,7 @@ TEST_F(MapServerTestFixture, LoadMapNull)
   ASSERT_EQ(resp->result, nav2_msgs::srv::LoadMap::Response::RESULT_MAP_DOES_NOT_EXIST);
 }
 
+// 发送请求加载地图, yaml 文件不存在
 // Send map loading service request with non-existing yaml file
 TEST_F(MapServerTestFixture, LoadMapInvalidYaml)
 {
@@ -176,6 +180,7 @@ TEST_F(MapServerTestFixture, LoadMapInvalidYaml)
   ASSERT_EQ(resp->result, nav2_msgs::srv::LoadMap::Response::RESULT_INVALID_MAP_METADATA);
 }
 
+// 发送请求加载地图, yaml 包含不存在的地图
 // Send map loading service request with yaml file containing non-existing map
 TEST_F(MapServerTestFixture, LoadMapInvalidImage)
 {
@@ -194,6 +199,7 @@ TEST_F(MapServerTestFixture, LoadMapInvalidImage)
   ASSERT_EQ(resp->result, nav2_msgs::srv::LoadMap::Response::RESULT_INVALID_MAP_DATA);
 }
 
+// 如果 yaml 为空, 测试服务器的行为
 /**
  * Test behaviour of server if yaml_filename is set to an empty string.
  */

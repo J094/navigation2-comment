@@ -95,6 +95,7 @@ protected:
     save_parameters.mode = MapMode::Trinary;
   }
 
+  // 检查 map_msg 是否和预设一致
   // Check that map_msg corresponds to reference pattern
   // Input: map_msg
   void verifyMapMsg(const nav_msgs::msg::OccupancyGrid & map_msg)
@@ -108,6 +109,7 @@ protected:
   }
 };
 
+// 读取一个 PGM 文件, 检查获取的 OccupancyGrid 消息是否一致
 // Load a valid reference PGM file. Check obtained OccupancyGrid message for consistency:
 // loaded image should match the known dimensions and content of the file.
 // Save obtained OccupancyGrid message into a tmp PGM file. Then load back saved tmp file
@@ -117,26 +119,34 @@ TEST_F(MapIOTester, loadSaveValidPGM)
 {
   // 1. Load reference map file and verify obtained OccupancyGrid
   LoadParameters loadParameters;
+  // 构造 LoadParameters 用于读取地图
   fillLoadParameters(path(TEST_DIR) / path(g_valid_pgm_file), loadParameters);
 
   nav_msgs::msg::OccupancyGrid map_msg;
+  // 调用 loadMapFromFile 来加载 map_msg
   ASSERT_NO_THROW(loadMapFromFile(loadParameters, map_msg));
 
+  // 验证 map_msg 是否正确加载
   verifyMapMsg(map_msg);
 
   // 2. Save OccupancyGrid into a tmp file
   SaveParameters saveParameters;
+  // 构造 SaveParameters 用于保存地图
   fillSaveParameters(path(g_tmp_dir) / path(g_valid_map_name), "pgm", saveParameters);
 
+  // 保存地图到图片和 yaml
   ASSERT_TRUE(saveMapToFile(map_msg, saveParameters));
 
+  // 这回通过 yaml 文件加载地图, 本质是从 yaml 中读取 LoadParameters
   // 3. Load saved map and verify it
   LOAD_MAP_STATUS status = loadMapFromYaml(path(g_tmp_dir) / path(g_valid_yaml_file), map_msg);
   ASSERT_EQ(status, LOAD_MAP_SUCCESS);
 
+  // 验证 map_msg 是否正确加载
   verifyMapMsg(map_msg);
 }
 
+// 读取一个 PNG 文件, 检查获取的 OccupancyGride 消息是否一致
 // Load a valid reference PNG file. Check obtained OccupancyGrid message for consistency:
 // loaded image should match the known dimensions and content of the file.
 // Save obtained OccupancyGrid message into a tmp PNG file. Then load back saved tmp file
@@ -166,6 +176,7 @@ TEST_F(MapIOTester, loadSaveValidPNG)
   verifyMapMsg(map_msg);
 }
 
+// 读取一个 BMP 文件, 检查获取的 OccupancyGride 消息是否一致
 // Load a valid reference BMP file. Check obtained OccupancyGrid message for consistency:
 // loaded image should match the known dimensions and content of the file.
 // Save obtained OccupancyGrid message into a tmp BMP file. Then load back saved tmp file
@@ -197,15 +208,19 @@ TEST_F(MapIOTester, loadSaveValidBMP)
   verifyMapMsg(map_msg);
 }
 
+// 读取地图, 是否可以用不同的模式保存地图
 // Load map from a valid file. Trying to save map with different modes.
 // Succeeds all steps were passed without a problem or expection.
 TEST_F(MapIOTester, loadSaveMapModes)
 {
+  // 按照 trinary 读取地图
   // 1. Load map from YAML file
   nav_msgs::msg::OccupancyGrid map_msg;
   LOAD_MAP_STATUS status = loadMapFromYaml(path(TEST_DIR) / path(g_valid_yaml_file), map_msg);
   ASSERT_EQ(status, LOAD_MAP_SUCCESS);
 
+  // trinary 模式的读取在前面的测试覆盖到了, 所以这里不需要考虑
+  // 按照 scale 保存
   // No need to check Trinary mode. This already verified in previous testcases.
   // 2. Save map in Scale mode.
   SaveParameters saveParameters;
@@ -214,17 +229,20 @@ TEST_F(MapIOTester, loadSaveMapModes)
 
   ASSERT_TRUE(saveMapToFile(map_msg, saveParameters));
 
+  // 按照 scale 读取
   // 3. Load saved map and verify it
   status = loadMapFromYaml(path(g_tmp_dir) / path(g_valid_yaml_file), map_msg);
   ASSERT_EQ(status, LOAD_MAP_SUCCESS);
 
   verifyMapMsg(map_msg);
 
+  // 按照 raw 保存
   // 4. Save map in Raw mode.
   saveParameters.mode = MapMode::Raw;
 
   ASSERT_TRUE(saveMapToFile(map_msg, saveParameters));
 
+  // 按照 raw 读取
   // 5. Load saved map and verify it
   status = loadMapFromYaml(path(g_tmp_dir) / path(g_valid_yaml_file), map_msg);
   ASSERT_EQ(status, LOAD_MAP_SUCCESS);
@@ -232,10 +250,12 @@ TEST_F(MapIOTester, loadSaveMapModes)
   verifyMapMsg(map_msg);
 }
 
+// 验证使用不同的方式触发读取错误
 // Try to load an invalid file with different ways.
 // Succeeds if all cases are got expected fail behaviours.
 TEST_F(MapIOTester, loadInvalidFile)
 {
+  // 在 loadMapFromFile() 中读取不正确的地图
   // 1. Trying to load incorrect map by loadMapFromFile()
   auto test_invalid = path(TEST_DIR) / path("foo");
 
@@ -245,6 +265,7 @@ TEST_F(MapIOTester, loadInvalidFile)
   nav_msgs::msg::OccupancyGrid map_msg;
   ASSERT_ANY_THROW(loadMapFromFile(loadParameters, map_msg));
 
+  // 在 loadMapFromYaml() 中读取不正确的地图
   // 2. Trying to load incorrect map by loadMapFromYaml()
   LOAD_MAP_STATUS status = loadMapFromYaml("", map_msg);
   ASSERT_EQ(status, MAP_DOES_NOT_EXIST);
@@ -253,6 +274,7 @@ TEST_F(MapIOTester, loadInvalidFile)
   ASSERT_EQ(status, INVALID_MAP_METADATA);
 }
 
+// 验证使用不同参数保存
 // Load map from a valid file. Trying to save map with different sets of parameters.
 // Succeeds if all cases got expected behaviours.
 TEST_F(MapIOTester, saveInvalidParameters)
@@ -288,6 +310,7 @@ TEST_F(MapIOTester, saveInvalidParameters)
   ASSERT_FALSE(saveMapToFile(map_msg, saveParameters));
 }
 
+// 验证读取 yaml 的正确性
 // Load valid YAML file and check for consistency
 TEST_F(MapIOTester, loadValidYAML)
 {
@@ -305,6 +328,7 @@ TEST_F(MapIOTester, loadValidYAML)
   ASSERT_EQ(loadParameters.negate, refLoadParameters.negate);
 }
 
+// 读取不正确的 yaml
 // Try to load invalid YAML file
 TEST_F(MapIOTester, loadInvalidYAML)
 {

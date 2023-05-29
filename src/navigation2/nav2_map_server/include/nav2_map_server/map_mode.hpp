@@ -27,6 +27,10 @@ namespace nav2_map_server
  */
 enum class MapMode
 {
+  // Trinary 模式, 有三种状态:
+  // 1. Occupied 100: 当亮度大于等于 occupied threshold
+  // 2. Unknown -1: 其他的情况
+  // 3. Free 0: 当亮度小于等于 free threshold
   /**
    * Together with associated threshold values (occupied and free):
    *   lightness >= occupied threshold - Occupied (100)
@@ -34,6 +38,10 @@ enum class MapMode
    *    lightness <= free threshold - Free (0)
    */
   Trinary,
+  // Scale 模式, 有三种状态:
+  // 1. Unknown -1: alpha 小于 1, 即带点透明
+  // 2. Occupied 100: 亮度大于等于 occ_th
+  // 3. Free 0: 亮度小于等于 free_th
   /**
    * Together with associated threshold values (occupied and free):
    *   alpha < 1.0 - Unknown (-1)
@@ -42,6 +50,10 @@ enum class MapMode
    *   lightness <= free_th - Free (0)
    */
   Scale,
+  // Raw 模式, 有三种状态:
+  // 1. Free 0: 亮度为 0
+  // 2. Occupied 100: 亮度等于 100
+  // 3. Unkown: 亮度大于等于 101
   /**
    * Lightness = 0 - Free (0)
    *          ... (linearly interpolate to)

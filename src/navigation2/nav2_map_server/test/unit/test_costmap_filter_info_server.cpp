@@ -28,6 +28,7 @@ using namespace std::chrono_literals;
 
 typedef std::recursive_mutex mutex_t;
 
+// 这是 c 语言的字符串定义
 static const char FILTER_INFO_TOPIC[] = "filter_info";
 static const int TYPE = 1;
 static const char MASK_TOPIC[] = "mask";
@@ -79,7 +80,9 @@ public:
   {
     access_ = new mutex_t();
 
+    // 创建 InfoServerWrapper
     info_server_ = std::make_shared<InfoServerWrapper>();
+    // 设置参数
     try {
       info_server_->set_parameter(rclcpp::Parameter("filter_info_topic", FILTER_INFO_TOPIC));
       info_server_->set_parameter(rclcpp::Parameter("type", TYPE));
@@ -93,8 +96,10 @@ public:
       throw;
     }
 
+    // 设置好参数后再开启服务
     info_server_->start();
 
+    // 配置订阅
     subscription_ = info_server_->create_subscription<nav2_msgs::msg::CostmapFilterInfo>(
       FILTER_INFO_TOPIC, rclcpp::QoS(rclcpp::KeepLast(1)).transient_local().reliable(),
       std::bind(&InfoServerTester::infoCallback, this, std::placeholders::_1));
@@ -138,9 +143,11 @@ private:
   mutex_t * access_;
 };
 
+// 测试 CostmapFIlterInfo 是否发布出来
 TEST_F(InfoServerTester, testCostmapFilterInfoPublish)
 {
   rclcpp::Time start_time = info_server_->now();
+  // 等待订阅, 订阅到了跳出
   while (!isReceived()) {
     rclcpp::spin_some(info_server_->get_node_base_interface());
     std::this_thread::sleep_for(100ms);
@@ -148,6 +155,7 @@ TEST_F(InfoServerTester, testCostmapFilterInfoPublish)
     ASSERT_TRUE((info_server_->now() - start_time) <= rclcpp::Duration(5000ms));
   }
 
+  // 检查订阅到的消息的正确性
   // Checking received CostmapFilterInfo for consistency
   EXPECT_EQ(info_->type, TYPE);
   EXPECT_EQ(info_->filter_mask_topic, MASK_TOPIC);
@@ -155,12 +163,14 @@ TEST_F(InfoServerTester, testCostmapFilterInfoPublish)
   EXPECT_NEAR(info_->multiplier, MULTIPLIER, EPSILON);
 }
 
+// 测试 deactivate 和 activate
 TEST_F(InfoServerTester, testCostmapFilterInfoDeactivateActivate)
 {
   info_server_->deactivate();
   info_ = nullptr;
   info_server_->activate();
 
+  // 在 deactivate 后重新 activate, 应该能重新订阅到
   rclcpp::Time start_time = info_server_->now();
   while (!isReceived()) {
     rclcpp::spin_some(info_server_->get_node_base_interface());
