@@ -33,6 +33,7 @@ BtNavigator::BtNavigator(const rclcpp::NodeOptions & options)
 {
   RCLCPP_INFO(get_logger(), "Creating");
 
+  // 准备一些 plugin 名称
   const std::vector<std::string> plugin_libs = {
     "nav2_compute_path_to_pose_action_bt_node",
     "nav2_compute_path_through_poses_action_bt_node",
@@ -113,6 +114,7 @@ BtNavigator::on_configure(const rclcpp_lifecycle::State & /*state*/)
   // Libraries to pull plugins (BT Nodes) from
   auto plugin_lib_names = get_parameter("plugin_lib_names").as_string_array();
 
+  // 实例化两个 navigator
   pose_navigator_ = std::make_unique<nav2_bt_navigator::NavigateToPoseNavigator>();
   poses_navigator_ = std::make_unique<nav2_bt_navigator::NavigateThroughPosesNavigator>();
 

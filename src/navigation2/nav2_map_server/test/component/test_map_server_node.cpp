@@ -33,6 +33,7 @@ using std::experimental::filesystem::path;
 
 using lifecycle_msgs::msg::Transition;
 
+// RclCppFixture 用来初始化 rclcpp 库
 class RclCppFixture
 {
 public:
@@ -40,8 +41,10 @@ public:
   ~RclCppFixture() {rclcpp::shutdown();}
 };
 
+// 这里实例化确保这个测试中 rclcpp 被初始化, 并且确保测试运行完后 rclcpp 被关闭
 RclCppFixture g_rclcppfixture;
 
+// Fixture 这个术语常用与软件测试领域, 表示执行一组测试所需要的基础设施和状态
 class MapServerTestFixture : public ::testing::Test
 {
 public:

@@ -84,10 +84,12 @@ protected:
    */
   nav2_util::CallbackReturn on_shutdown(const rclcpp_lifecycle::State & state) override;
 
+  // 两个 navitator 用来实际执行 BT 相关逻辑
   // To handle all the BT related execution
   std::unique_ptr<nav2_bt_navigator::Navigator<nav2_msgs::action::NavigateToPose>> pose_navigator_;
   std::unique_ptr<nav2_bt_navigator::Navigator<nav2_msgs::action::NavigateThroughPoses>>
   poses_navigator_;
+  // 一个 muxer 只允许一个 plugin 工作
   nav2_bt_navigator::NavigatorMuxer plugin_muxer_;
 
   // Odometry smoother object

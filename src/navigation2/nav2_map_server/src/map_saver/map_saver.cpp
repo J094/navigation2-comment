@@ -46,6 +46,7 @@ MapSaver::MapSaver(const rclcpp::NodeOptions & options)
 {
   RCLCPP_INFO(get_logger(), "Creating");
 
+  // 构造函数中声明参数
   // Declare the node parameters
   declare_parameter("save_map_timeout", 2.0);
   declare_parameter("free_thresh_default", 0.25);
@@ -71,6 +72,7 @@ MapSaver::on_configure(const rclcpp_lifecycle::State & /*state*/)
   occupied_thresh_default_ = get_parameter("occupied_thresh_default").as_double();
   map_subscribe_transient_local_ = get_parameter("map_subscribe_transient_local").as_bool();
 
+  // 创建保存地图的服务
   // Create a service that saves the occupancy grid from map topic to a file
   save_map_service_ = create_service<nav2_msgs::srv::SaveMap>(
     service_prefix + save_map_service_name_,
@@ -106,6 +108,7 @@ MapSaver::on_cleanup(const rclcpp_lifecycle::State & /*state*/)
 {
   RCLCPP_INFO(get_logger(), "Cleaning up");
 
+  // 这里只需要重置保存地图服务即可
   save_map_service_.reset();
 
   return nav2_util::CallbackReturn::SUCCESS;
@@ -124,6 +127,7 @@ void MapSaver::saveMapCallback(
   std::shared_ptr<nav2_msgs::srv::SaveMap::Response> response)
 {
   // Set input arguments and call saveMapTopicToFile()
+  // 创建要保存的参数, 从请求中获取
   SaveParameters save_parameters;
   save_parameters.map_file_name = request->map_url;
   save_parameters.image_format = request->image_format;
@@ -138,6 +142,7 @@ void MapSaver::saveMapCallback(
       request->map_mode.c_str());
   }
 
+  // 从 topic 中保存地图
   response->result = saveMapTopicToFile(request->map_topic, save_parameters);
 }
 
@@ -178,8 +183,11 @@ bool MapSaver::saveMapTopicToFile(
       save_parameters_loc.occupied_thresh = occupied_thresh_default_;
     }
 
+    // std::promise 和 std::future 通常用在不同线程之间传递值
+    // 当 promise 的值被设置 set_value 时, future 可以通过 get 获取
     std::promise<nav_msgs::msg::OccupancyGrid::SharedPtr> prom;
     std::future<nav_msgs::msg::OccupancyGrid::SharedPtr> future_result = prom.get_future();
+    // 定义一个 callback 函数来获取地图
     // A callback function that receives map message from subscribed topic
     auto mapCallback = [&prom](
       const nav_msgs::msg::OccupancyGrid::SharedPtr msg) -> void {
@@ -200,6 +208,7 @@ bool MapSaver::saveMapTopicToFile(
 
     auto option = rclcpp::SubscriptionOptions();
     option.callback_group = callback_group;
+    // 创建订阅来订阅 latched topic, 然后获取地图
     auto map_sub = create_subscription<nav_msgs::msg::OccupancyGrid>(
       map_topic_loc, map_qos, mapCallback, option);
 
@@ -208,6 +217,7 @@ bool MapSaver::saveMapTopicToFile(
     executor.add_callback_group(callback_group, get_node_base_interface());
     // Spin until map message received
     auto timeout = save_map_timeout_->to_chrono<std::chrono::nanoseconds>();
+    // 一直到地图获取到
     auto status = executor.spin_until_future_complete(future_result, timeout);
     if (status != rclcpp::FutureReturnCode::SUCCESS) {
       RCLCPP_ERROR(get_logger(), "Failed to spin map subscription");
@@ -217,6 +227,7 @@ bool MapSaver::saveMapTopicToFile(
     map_sub.reset();
     // Map message received. Saving it to file
     nav_msgs::msg::OccupancyGrid::SharedPtr map_msg = future_result.get();
+    // 最后从 future_result 中获取地图, 然后保存地图到文件
     if (saveMapToFile(*map_msg, save_parameters_loc)) {
       RCLCPP_INFO(get_logger(), "Map saved successfully");
       return true;

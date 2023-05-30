@@ -60,7 +60,7 @@ NavigateToPoseNavigator::getDefaultBTFilepath(
 {
   std::string default_bt_xml_filename;
   auto node = parent_node.lock();
-
+  // 节点需要有 "default_nav_to_pose_bt_xml"
   if (!node->has_parameter("default_nav_to_pose_bt_xml")) {
     std::string pkg_share_dir =
       ament_index_cpp::get_package_share_directory("nav2_bt_navigator");

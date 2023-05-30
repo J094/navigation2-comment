@@ -67,6 +67,7 @@ MapServer::MapServer(const rclcpp::NodeOptions & options)
 {
   RCLCPP_INFO(get_logger(), "Creating");
 
+  // 在构造函数中声明参数
   // Declare the node parameters
   declare_parameter("yaml_filename", rclcpp::PARAMETER_STRING);
   declare_parameter("topic_name", "map");
@@ -82,6 +83,7 @@ MapServer::on_configure(const rclcpp_lifecycle::State & /*state*/)
 {
   RCLCPP_INFO(get_logger(), "Configuring");
 
+  // 获取参数
   // Get the name of the YAML file to use (can be empty if no initial map should be used)
   std::string yaml_filename = get_parameter("yaml_filename").as_string();
   std::string topic_name = get_parameter("topic_name").as_string();
@@ -94,6 +96,7 @@ MapServer::on_configure(const rclcpp_lifecycle::State & /*state*/)
     std::shared_ptr<nav2_msgs::srv::LoadMap::Response> rsp =
       std::make_shared<nav2_msgs::srv::LoadMap::Response>();
 
+    // 加载地图给 response
     if (!loadMapResponseFromYaml(yaml_filename, rsp)) {
       throw std::runtime_error("Failed to load map yaml file: " + yaml_filename);
     }
@@ -107,16 +110,20 @@ MapServer::on_configure(const rclcpp_lifecycle::State & /*state*/)
   // Make name prefix for services
   const std::string service_prefix = get_name() + std::string("/");
 
+  // 创建提供地图的服务 occ_service
   // Create a service that provides the occupancy grid
   occ_service_ = create_service<nav_msgs::srv::GetMap>(
     service_prefix + std::string(service_name_),
     std::bind(&MapServer::getMapCallback, this, _1, _2, _3));
 
+  // 创建发布地图的服务, 这里采用 latched topic,
+  // 保证只发布一次, 可以订阅随时取用
   // Create a publisher using the QoS settings to emulate a ROS1 latched topic
   occ_pub_ = create_publisher<nav_msgs::msg::OccupancyGrid>(
     topic_name,
     rclcpp::QoS(rclcpp::KeepLast(1)).transient_local().reliable());
 
+  // 创建加载地图的服务 load_map_service
   // Create a service that loads the occupancy grid from a file
   load_map_service_ = create_service<nav2_msgs::srv::LoadMap>(
     service_prefix + std::string(load_map_service_name_),
@@ -130,13 +137,17 @@ MapServer::on_activate(const rclcpp_lifecycle::State & /*state*/)
 {
   RCLCPP_INFO(get_logger(), "Activating");
 
+  // 使用锁存消息来发布地图
   // Publish the map using the latched topic
+  // 地图发布前得先激活发布者
   occ_pub_->on_activate();
   if (map_available_) {
     auto occ_grid = std::make_unique<nav_msgs::msg::OccupancyGrid>(msg_);
     occ_pub_->publish(std::move(occ_grid));
   }
 
+  // 这里创建 MapServer 和 LifecycleManager 的联系,
+  // 需要在激活的时候创建
   // create bond connection
   createBond();
 
@@ -148,8 +159,10 @@ MapServer::on_deactivate(const rclcpp_lifecycle::State & /*state*/)
 {
   RCLCPP_INFO(get_logger(), "Deactivating");
 
+  // 停止发布
   occ_pub_->on_deactivate();
 
+  // 清除联系
   // destroy bond connection
   destroyBond();
 
@@ -161,6 +174,8 @@ MapServer::on_cleanup(const rclcpp_lifecycle::State & /*state*/)
 {
   RCLCPP_INFO(get_logger(), "Cleaning up");
 
+  // 释放当前指针指向的对象,
+  // 并且可以让当前指针指向新的对象
   occ_pub_.reset();
   occ_service_.reset();
   load_map_service_.reset();
@@ -174,6 +189,7 @@ nav2_util::CallbackReturn
 MapServer::on_shutdown(const rclcpp_lifecycle::State & /*state*/)
 {
   RCLCPP_INFO(get_logger(), "Shutting down");
+  // 这里不做任何处理, 因为通常在 shutdown 之前会 deactivate 和 clean up
   return nav2_util::CallbackReturn::SUCCESS;
 }
 
@@ -190,6 +206,7 @@ void MapServer::getMapCallback(
     return;
   }
   RCLCPP_INFO(get_logger(), "Handling GetMap request");
+  // 把地图交出去
   response->map = msg_;
 }
 
@@ -207,9 +224,18 @@ void MapServer::loadMapCallback(
     return;
   }
   RCLCPP_INFO(get_logger(), "Handling LoadMap request");
+  // 这里根据提供的 yaml 文件地址读取地图
   // Load from file
   if (loadMapResponseFromYaml(request->map_url, response)) {
     auto occ_grid = std::make_unique<nav_msgs::msg::OccupancyGrid>(msg_);
+    // 加载地图后发布
+    // 这里 occ_grid 为 unique_ptr, 只想的对象只有这一个指针
+    // 采用 std::move 操作将 occ_grid 指向的对象所有权交给其他指针,
+    // 此时 occ_grid 会被清理掉
+    // 注意:
+    // 1. 这里主要为了在发布过程中地图不会更改, 因为 msg_ 是个成员  变量
+    // 2. 这里如果不使用 ptr, 则需要两次拷贝
+    // 3. unique_ptr 只能 move 不能拷贝
     occ_pub_->publish(std::move(occ_grid));  // publish new map
   }
 }
@@ -230,9 +256,12 @@ bool MapServer::loadMapResponseFromYaml(
       return false;
     case LOAD_MAP_SUCCESS:
       // Correcting msg_ header when it belongs to specific node
+      // 由于成功加载地图, 需要更新下信息
       updateMsgHeader();
 
+      // map 可用标记
       map_available_ = true;
+      // 提供地图
       response->map = msg_;
       response->result = nav2_msgs::srv::LoadMap::Response::RESULT_SUCCESS;
   }

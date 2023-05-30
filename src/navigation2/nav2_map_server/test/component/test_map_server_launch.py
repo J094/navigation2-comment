@@ -26,7 +26,9 @@ from launch_testing.legacy import LaunchTestService
 
 
 def main(argv=sys.argv[1:]):
+    # launch 地图管理服务
     launchFile = os.path.join(os.getenv('TEST_LAUNCH_DIR'), 'map_server_node.launch.py')
+    # 测试执行程序
     testExecutable = os.getenv('TEST_EXECUTABLE')
     ld = LaunchDescription([
         IncludeLaunchDescription(PythonLaunchDescriptionSource([launchFile])),

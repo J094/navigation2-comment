@@ -30,6 +30,7 @@
 namespace nav2_bt_navigator
 {
 
+// 保存一些反馈参数
 /**
  * @struct FeedbackUtils
  * @brief Navigator feedback utilities required to get transforms and reference frames.
@@ -63,6 +64,7 @@ public:
   bool isNavigating()
   {
     std::scoped_lock l(mutex_);
+    // 不为空表示还在导航中
     return !current_navigator_.empty();
   }
 
@@ -73,6 +75,7 @@ public:
   void startNavigating(const std::string & navigator_name)
   {
     std::scoped_lock l(mutex_);
+    // 如果还在其他导航状态, 不能开启下一次导航
     if (!current_navigator_.empty()) {
       RCLCPP_ERROR(
         rclcpp::get_logger("NavigatorMutex"),
@@ -80,6 +83,7 @@ public:
         " task is in progress! This likely occurred from an incorrect"
         "implementation of a navigator plugin.");
     }
+    // 说明开启了新的导航
     current_navigator_ = navigator_name;
   }
 
@@ -90,6 +94,7 @@ public:
   void stopNavigating(const std::string & navigator_name)
   {
     std::scoped_lock l(mutex_);
+    // 必须还在导航状态中, 才能停止
     if (current_navigator_ != navigator_name) {
       RCLCPP_ERROR(
         rclcpp::get_logger("NavigatorMutex"),
@@ -97,12 +102,15 @@ public:
         " task is in progress! This likely occurred from an incorrect"
         "implementation of a navigator plugin.");
     } else {
+      // 停止就是将当前导航状态赋空
       current_navigator_ = std::string("");
     }
   }
 
 protected:
+  // 当前的 plugin 名称
   std::string current_navigator_;
+  // 互斥锁
   std::mutex mutex_;
 };
 
@@ -114,6 +122,7 @@ template<class ActionT>
 class Navigator
 {
 public:
+  // 设置 Ptr 为 shared_ptr
   using Ptr = std::shared_ptr<nav2_bt_navigator::Navigator<ActionT>>;
 
   /**
@@ -121,6 +130,7 @@ public:
    */
   Navigator()
   {
+    // 构造函数初始化 plugin_muxer_ 为空指针
     plugin_muxer_ = nullptr;
   }
 
@@ -146,15 +156,20 @@ public:
     nav2_bt_navigator::NavigatorMuxer * plugin_muxer,
     std::shared_ptr<nav2_util::OdomSmoother> odom_smoother)
   {
+    // parent_node 是一个 weak_ptr, 功能和 shared_ptr 一样, 但是不会增加引用计数
+    // 通过 lock() 可以返回指向对象的一个 shared_ptr, 如果对象还存在
+    // 如果对象不存在, 则会返回空的 shared_ptr
     auto node = parent_node.lock();
     logger_ = node->get_logger();
     clock_ = node->get_clock();
     feedback_utils_ = feedback_utils;
     plugin_muxer_ = plugin_muxer;
 
+    // 获取这个 navigator 的默认行为树
     // get the default behavior tree for this navigator
     std::string default_bt_xml_filename = getDefaultBTFilepath(parent_node);
 
+    // 创建行为树 action server
     // Create the Behavior Tree Action Server for this navigator
     bt_action_server_ = std::make_unique<nav2_behavior_tree::BtActionServer<ActionT>>(
       node,
