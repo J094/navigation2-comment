@@ -29,12 +29,14 @@
 namespace nav2_behavior_tree
 {
 
+// BT 节点的状态: SUCCEEDED, FAILED, CANCELED 三个
 /**
  * @enum nav2_behavior_tree::BtStatus
  * @brief An enum class representing BT execution status
  */
 enum class BtStatus { SUCCEEDED, FAILED, CANCELED };
 
+// BT 的引擎, 创建和执行 BTs
 /**
  * @class nav2_behavior_tree::BehaviorTreeEngine
  * @brief A class to create and handle behavior trees
@@ -90,6 +92,7 @@ public:
   void haltAllActions(BT::TreeNode * root_node);
 
 protected:
+  // 使用 BT factory 可以动态构建 BT
   // The factory that will be used to dynamically construct the behavior tree
   BT::BehaviorTreeFactory factory_;
 };

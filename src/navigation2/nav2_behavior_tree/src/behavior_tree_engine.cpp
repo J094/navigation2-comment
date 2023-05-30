@@ -27,8 +27,10 @@ namespace nav2_behavior_tree
 
 BehaviorTreeEngine::BehaviorTreeEngine(const std::vector<std::string> & plugin_libraries)
 {
+  // loader 加载 plugins
   BT::SharedLibrary loader;
   for (const auto & p : plugin_libraries) {
+    // 通过名称注册加载 plugin 库
     factory_.registerFromPlugin(loader.getOSName(p));
   }
 }

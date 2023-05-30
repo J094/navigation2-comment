@@ -39,6 +39,7 @@ class NavigateToPoseNavigator
   : public nav2_bt_navigator::Navigator<nav2_msgs::action::NavigateToPose>
 {
 public:
+  // ActionT 就是 NavigateToPose
   using ActionT = nav2_msgs::action::NavigateToPose;
 
   /**
