@@ -47,6 +47,7 @@ BT::NodeStatus GoalReachedCondition::tick()
     initialize();
   }
 
+  // 到达了 goal 返回 SUCCESS
   if (isGoalReached()) {
     return BT::NodeStatus::SUCCESS;
   }
@@ -84,6 +85,7 @@ bool GoalReachedCondition::isGoalReached()
   double dx = goal.pose.position.x - current_pose.pose.position.x;
   double dy = goal.pose.position.y - current_pose.pose.position.y;
 
+  // 检查是否接近
   return (dx * dx + dy * dy) <= (goal_reached_tol_ * goal_reached_tol_);
 }
 

@@ -27,17 +27,21 @@ GoalUpdatedCondition::GoalUpdatedCondition(
 
 BT::NodeStatus GoalUpdatedCondition::tick()
 {
+  // IDLE 状态返回 FAILURE
   if (status() == BT::NodeStatus::IDLE) {
+    // 拿到 goals 和 goal
     config().blackboard->get<std::vector<geometry_msgs::msg::PoseStamped>>("goals", goals_);
     config().blackboard->get<geometry_msgs::msg::PoseStamped>("goal", goal_);
     return BT::NodeStatus::FAILURE;
   }
 
+  // 获取当前 goals 和 goal
   std::vector<geometry_msgs::msg::PoseStamped> current_goals;
   config().blackboard->get<std::vector<geometry_msgs::msg::PoseStamped>>("goals", current_goals);
   geometry_msgs::msg::PoseStamped current_goal;
   config().blackboard->get<geometry_msgs::msg::PoseStamped>("goal", current_goal);
 
+  // 对比, 如果更新了就更新 goals 和 goal 并返回 SUCCESS
   if (goal_ != current_goal || goals_ != current_goals) {
     goal_ = current_goal;
     goals_ = current_goals;

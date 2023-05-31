@@ -56,6 +56,8 @@ BT::NodeStatus TransformAvailableCondition::tick()
     return BT::NodeStatus::SUCCESS;
   }
 
+  // 寻找 transform
+  // 如果找到设置 was_found_
   std::string tf_error;
   bool found = tf_->canTransform(
     child_frame_, parent_frame_, tf2::TimePointZero, &tf_error);

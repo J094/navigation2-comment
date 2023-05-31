@@ -47,6 +47,8 @@ public:
 };
 
 
+// 测试错误的语法输入导致结果
+// 错误应该会导致消息空初始化
 TEST(PointPortTest, test_wrong_syntax)
 {
   std::string xml_txt =
@@ -58,6 +60,8 @@ TEST(PointPortTest, test_wrong_syntax)
       </root>)";
 
   BT::BehaviorTreeFactory factory;
+  // 向工厂添加 TestNode, 名称为 PointPort
+  // 提供传输 geometry_msgs::msg::Point 消息
   factory.registerNodeType<TestNode<geometry_msgs::msg::Point>>("PointPort");
   auto tree = factory.createTreeFromText(xml_txt);
 
@@ -82,6 +86,8 @@ TEST(PointPortTest, test_wrong_syntax)
   EXPECT_EQ(value.z, 0.0);
 }
 
+// 测试正确的语法输入导致结果
+// 正确应该会导致消息初始化为给定值
 TEST(PointPortTest, test_correct_syntax)
 {
   std::string xml_txt =
@@ -103,6 +109,7 @@ TEST(PointPortTest, test_correct_syntax)
   EXPECT_EQ(value.z, 3.0);
 }
 
+// 这里测试 Quaternion
 TEST(QuaternionPortTest, test_wrong_syntax)
 {
   std::string xml_txt =
@@ -162,6 +169,7 @@ TEST(QuaternionPortTest, test_correct_syntax)
   EXPECT_EQ(value.w, 0.7);
 }
 
+// 这里测试 PoseStamped
 TEST(PoseStampedPortTest, test_wrong_syntax)
 {
   std::string xml_txt =
@@ -237,6 +245,7 @@ TEST(PoseStampedPortTest, test_correct_syntax)
   EXPECT_EQ(value.pose.orientation.w, 7.0);
 }
 
+// 这里测试 Milliseconds
 TEST(MillisecondsPortTest, test_correct_syntax)
 {
   std::string xml_txt =
@@ -265,5 +274,6 @@ TEST(MillisecondsPortTest, test_correct_syntax)
 
   tree = factory.createTreeFromText(xml_txt);
   tree.rootNode()->getInput("test", value);
+  // 只取整数
   EXPECT_EQ(value.count(), 123);
 }

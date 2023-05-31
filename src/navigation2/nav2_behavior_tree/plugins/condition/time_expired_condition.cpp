@@ -36,21 +36,26 @@ TimeExpiredCondition::TimeExpiredCondition(
 
 BT::NodeStatus TimeExpiredCondition::tick()
 {
+  // 如果处于 IDLE, 意味没有 expired, 返回 FAILURE
   if (status() == BT::NodeStatus::IDLE) {
     start_ = node_->now();
     return BT::NodeStatus::FAILURE;
   }
 
+  // 计算这一个循环所经历的时间
   // Determine how long its been since we've started this iteration
   auto elapsed = node_->now() - start_;
 
   // Now, get that in seconds
   auto seconds = elapsed.seconds();
 
+  // 如果经历的时间少于 period_ 则返回 FAILURE
   if (seconds < period_) {
     return BT::NodeStatus::FAILURE;
   }
 
+  // 如果时间超过了, 重置开始时间, 返回 SUCCESS
+  // 该节点的作用就是保证一定时间的运行才返回 SUCCESS
   start_ = node_->now();  // Reset the timer
   return BT::NodeStatus::SUCCESS;
 }

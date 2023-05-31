@@ -62,12 +62,14 @@ void IsStuckCondition::onOdomReceived(const typename nav_msgs::msg::Odometry::Sh
 {
   RCLCPP_INFO_ONCE(node_->get_logger(), "Got odometry");
 
+  // 确保固定长度的历史被保存
   while (odom_history_.size() >= odom_history_size_) {
     odom_history_.pop_front();
   }
 
   odom_history_.push_back(*msg);
 
+  // 这里每次获取到 odom 就会更新状态
   // TODO(orduno) #383 Move the state calculation and is stuck to robot class
   updateStates();
 }
@@ -78,6 +80,7 @@ BT::NodeStatus IsStuckCondition::tick()
   //              this becomes
   // if (robot_state_.isStuck()) {
 
+  // 检查是否 stuck 了
   if (is_stuck_) {
     logStuck("Robot got stuck!");
     return BT::NodeStatus::SUCCESS;  // Successfully detected a stuck condition
@@ -101,6 +104,7 @@ void IsStuckCondition::logStuck(const std::string & msg) const
 
 void IsStuckCondition::updateStates()
 {
+  // 这里计算大致的加速度
   // Approximate acceleration
   // TODO(orduno) #400 Smooth out velocity history for better accel approx.
   if (odom_history_.size() > 2) {
@@ -129,6 +133,7 @@ bool IsStuckCondition::isStuck()
   // harsh deceleration. A better approach to capture all situations would be to do a forward
   // simulation of the robot motion and compare it with the actual one.
 
+  // 这里检测当前加速度是否小于刹车加速度限制, 如果小于则表示有一个异常的减速, 机器人可能 stuck 了
   // Detect if robot bumped into something by checking for abnormal deceleration
   if (current_accel_ < brake_accel_limit_) {
     RCLCPP_DEBUG(

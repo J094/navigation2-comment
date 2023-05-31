@@ -47,6 +47,7 @@ SpeedController::SpeedController(
     throw BT::BehaviorTreeException(err_msg);
   }
 
+  // 间隔计算
   d_rate_ = max_rate_ - min_rate_;
   d_speed_ = max_speed_ - min_speed_;
 
@@ -58,6 +59,7 @@ SpeedController::SpeedController(
 
 inline BT::NodeStatus SpeedController::tick()
 {
+  // IDLE 获取 goals 和 goal
   if (status() == BT::NodeStatus::IDLE) {
     // Reset since we're starting a new iteration of
     // the speed controller (moving from IDLE to RUNNING)
@@ -68,11 +70,14 @@ inline BT::NodeStatus SpeedController::tick()
     first_tick_ = true;
   }
 
+  // 获取当前的 goals 和 goal
   std::vector<geometry_msgs::msg::PoseStamped> current_goals;
   config().blackboard->get<std::vector<geometry_msgs::msg::PoseStamped>>("goals", current_goals);
   geometry_msgs::msg::PoseStamped current_goal;
   config().blackboard->get<geometry_msgs::msg::PoseStamped>("goal", current_goal);
 
+  // 如果 goals 和 goal 发生变化, 更新状态
+  // 开始时间都是 goals 和 goal 发生变化的时间
   if (goal_ != current_goal || goals_ != current_goals) {
     // Reset state and set period to max since we have a new goal
     period_ = 1.0 / max_rate_;
@@ -84,8 +89,12 @@ inline BT::NodeStatus SpeedController::tick()
 
   setStatus(BT::NodeStatus::RUNNING);
 
+  // 目标没有更新的时间
   auto elapsed = node_->now() - start_;
 
+  // 如果目标没有更新的时间大于了 period, 就 tick 一下
+  // 周期 tick 只会发生在第一次 tick 失败或成功的情况
+  // 在 RUNNING 中会不断 tick
   // The child gets ticked the first time through and any time the period has
   // expired. In addition, once the child begins to run, it is ticked each time
   // 'til completion
@@ -94,6 +103,7 @@ inline BT::NodeStatus SpeedController::tick()
   {
     first_tick_ = false;
 
+    // tick 过了就要更新开始时间
     // update period if the last period is exceeded
     if (elapsed.seconds() >= period_) {
       updatePeriod();

@@ -34,11 +34,13 @@ IsPathValidCondition::IsPathValidCondition(
 
 BT::NodeStatus IsPathValidCondition::tick()
 {
+  // 先获取到 path
   nav_msgs::msg::Path path;
   getInput("path", path);
 
   auto request = std::make_shared<nav2_msgs::srv::IsPathValid::Request>();
 
+  // 调用服务检测是否 valid
   request->path = path;
   auto result = client_->async_send_request(request);
 

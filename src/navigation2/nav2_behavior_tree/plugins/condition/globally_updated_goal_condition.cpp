@@ -31,6 +31,8 @@ GloballyUpdatedGoalCondition::GloballyUpdatedGoalCondition(
 
 BT::NodeStatus GloballyUpdatedGoalCondition::tick()
 {
+  // 第一次就算是设置了 goals 和 goal
+  // 返回 SUCCESS
   if (first_time) {
     first_time = false;
     config().blackboard->get<std::vector<geometry_msgs::msg::PoseStamped>>("goals", goals_);
@@ -38,6 +40,7 @@ BT::NodeStatus GloballyUpdatedGoalCondition::tick()
     return BT::NodeStatus::SUCCESS;
   }
 
+  // 后面的和 goal updated 一样
   std::vector<geometry_msgs::msg::PoseStamped> current_goals;
   config().blackboard->get<std::vector<geometry_msgs::msg::PoseStamped>>("goals", current_goals);
   geometry_msgs::msg::PoseStamped current_goal;

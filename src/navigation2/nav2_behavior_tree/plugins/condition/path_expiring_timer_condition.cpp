@@ -35,6 +35,9 @@ PathExpiringTimerCondition::PathExpiringTimerCondition(
 
 BT::NodeStatus PathExpiringTimerCondition::tick()
 {
+  // 第一次
+  // 获取之前的路径
+  // 获取开始时间
   if (first_time_) {
     getInput("path", prev_path_);
     first_time_ = false;
@@ -42,26 +45,32 @@ BT::NodeStatus PathExpiringTimerCondition::tick()
     return BT::NodeStatus::FAILURE;
   }
 
+  // 获取新的路径
   // Grab the new path
   nav_msgs::msg::Path path;
   getInput("path", path);
 
+  // 如果新的路径被更新了, 则要更新之前的路径和时间
   // Reset timer if the path has been updated
   if (prev_path_ != path) {
     prev_path_ = path;
     start_ = node_->now();
   }
 
+  // 计算一条路径没有更新的时间
   // Determine how long its been since we've started this iteration
   auto elapsed = node_->now() - start_;
 
   // Now, get that in seconds
   auto seconds = elapsed.seconds();
 
+  // 如果一条路径没有超过 period 就更新了, 那么返回 FAILURE
   if (seconds < period_) {
     return BT::NodeStatus::FAILURE;
   }
 
+  // 如果当前路径超过了时间还没更新, 则重置开始时间, 返回 SUCCESS
+  // 这里主要检测路径是否及时更新
   start_ = node_->now();  // Reset the timer
   return BT::NodeStatus::SUCCESS;
 }

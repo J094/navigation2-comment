@@ -49,6 +49,7 @@ IsBatteryLowCondition::IsBatteryLowCondition(
 
 BT::NodeStatus IsBatteryLowCondition::tick()
 {
+  // 检查低电压状态
   callback_group_executor_.spin_some();
   if (is_battery_low_) {
     return BT::NodeStatus::SUCCESS;
@@ -58,6 +59,7 @@ BT::NodeStatus IsBatteryLowCondition::tick()
 
 void IsBatteryLowCondition::batteryCallback(sensor_msgs::msg::BatteryState::SharedPtr msg)
 {
+  // 这里检测是否低电压
   if (is_voltage_) {
     is_battery_low_ = msg->voltage <= min_battery_;
   } else {

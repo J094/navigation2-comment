@@ -50,6 +50,7 @@ DistanceController::DistanceController(
 
 inline BT::NodeStatus DistanceController::tick()
 {
+  // IDLE 状态下获取初始位姿
   if (status() == BT::NodeStatus::IDLE) {
     // Reset the starting position since we're starting a new iteration of
     // the distance controller (moving from IDLE to RUNNING)
@@ -65,6 +66,7 @@ inline BT::NodeStatus DistanceController::tick()
 
   setStatus(BT::NodeStatus::RUNNING);
 
+  // 获取当前位姿
   // Determine distance travelled since we've started this iteration
   geometry_msgs::msg::PoseStamped current_pose;
   if (!nav2_util::getCurrentPose(
@@ -75,10 +77,13 @@ inline BT::NodeStatus DistanceController::tick()
     return BT::NodeStatus::FAILURE;
   }
 
+  // 计算运行距离
   // Get euclidean distance
   auto travelled = nav2_util::geometry_utils::euclidean_distance(
     start_pose_.pose, current_pose.pose);
 
+  // 运行距离大于 distance 就 tick 一次
+  // 子节点如果在运行中则不停 tick
   // The child gets ticked the first time through and every time the threshold
   // distance is crossed. In addition, once the child begins to run, it is
   // ticked each time 'til completion
@@ -93,6 +98,7 @@ inline BT::NodeStatus DistanceController::tick()
         return BT::NodeStatus::RUNNING;
 
       case BT::NodeStatus::SUCCESS:
+        // 如果成功了, 则更新开始位姿
         if (!nav2_util::getCurrentPose(
             start_pose_, *tf_, global_frame_, robot_base_frame_,
             transform_tolerance_))
@@ -100,6 +106,7 @@ inline BT::NodeStatus DistanceController::tick()
           RCLCPP_DEBUG(node_->get_logger(), "Current robot pose is not available.");
           return BT::NodeStatus::FAILURE;
         }
+        // 如果成功更新了开始位姿，则返回 SUCCESS
         return BT::NodeStatus::SUCCESS;
 
       case BT::NodeStatus::FAILURE:

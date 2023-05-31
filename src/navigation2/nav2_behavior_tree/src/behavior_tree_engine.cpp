@@ -102,6 +102,7 @@ BehaviorTreeEngine::haltAllActions(BT::TreeNode * root_node)
         node->halt();
       }
     };
+  // 对每一个正在运行的节点执行 halt()
   BT::applyRecursiveVisitor(root_node, visitor);
 }
 

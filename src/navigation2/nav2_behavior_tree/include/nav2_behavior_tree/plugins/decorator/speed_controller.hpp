@@ -73,6 +73,9 @@ private:
    */
   inline double getScaledRate(const double & speed)
   {
+    // 需要在 min_rate 和 max_rate 之间
+    // 计算 speed 在 min_speed 和 max_speed 之间的位置
+    // 然后计算 rate, 速度越快 rate 越大, 周期越小, tick 越快
     return std::max(
       std::min(
         (((speed - min_speed_) / d_speed_) * d_rate_) + min_rate_,
@@ -84,8 +87,11 @@ private:
    */
   inline void updatePeriod()
   {
+    // 拿到xy速度
     auto velocity = odom_smoother_->getTwist();
+    // 拿到实际速度
     double speed = std::hypot(velocity.linear.x, velocity.linear.y);
+    // 计算 rate 和 period
     double rate = getScaledRate(speed);
     period_ = 1.0 / rate;
   }

@@ -38,6 +38,7 @@ DistanceTraveledCondition::DistanceTraveledCondition(
   getInput("robot_base_frame", robot_base_frame_);
   node_ = config().blackboard->get<rclcpp::Node::SharedPtr>("node");
   tf_ = config().blackboard->get<std::shared_ptr<tf2_ros::Buffer>>("tf_buffer");
+  // 从节点中才能知道 transform_tolerance
   node_->get_parameter("transform_tolerance", transform_tolerance_);
 }
 
@@ -50,6 +51,7 @@ BT::NodeStatus DistanceTraveledCondition::tick()
     {
       RCLCPP_DEBUG(node_->get_logger(), "Current robot pose is not available.");
     }
+    // IDLE 状态返回 FAILURE
     return BT::NodeStatus::FAILURE;
   }
 
@@ -59,27 +61,34 @@ BT::NodeStatus DistanceTraveledCondition::tick()
       current_pose, *tf_, global_frame_, robot_base_frame_,
       transform_tolerance_))
   {
+    // 如果获取不到当前的姿态, 返回 FAILURE
     RCLCPP_DEBUG(node_->get_logger(), "Current robot pose is not available.");
     return BT::NodeStatus::FAILURE;
   }
 
+  // 计算开始点到当前点的欧氏距离
   // Get euclidean distance
   auto travelled = nav2_util::geometry_utils::euclidean_distance(
     start_pose_.pose, current_pose.pose);
 
+  // 欧氏距离小于 distance_ 表示没有跑这么多距离
+  // 返回 FAILURE
   if (travelled < distance_) {
     return BT::NodeStatus::FAILURE;
   }
 
+  // 如果跑了这么多距离, 更新开始点
   // Update start pose
   start_pose_ = current_pose;
 
+  // 返回 SUCCESS
   return BT::NodeStatus::SUCCESS;
 }
 
 }  // namespace nav2_behavior_tree
 
 #include "behaviortree_cpp_v3/bt_factory.h"
+// 这里定义宏来 register 节点
 BT_REGISTER_NODES(factory)
 {
   factory.registerNodeType<nav2_behavior_tree::DistanceTraveledCondition>("DistanceTraveled");
