@@ -47,6 +47,7 @@ BT::NodeStatus PipelineSequence::tick()
         // we'll exit the loop and hit the wrap-up code at the end of the method.
         break;
       case BT::NodeStatus::RUNNING:
+        // 这里只允许没有 tick 过的节点返回状态
         if (i >= last_child_ticked_) {
           last_child_ticked_ = i;
           return status;
@@ -60,6 +61,7 @@ BT::NodeStatus PipelineSequence::tick()
         throw std::runtime_error(error_msg.str());
     }
   }
+  // 所有节点都 tick 过, 所有节点都 SUCCESS 过, 返回 SUCCESS
   // Wrap up.
   ControlNode::haltChildren();
   last_child_ticked_ = 0;  // reset

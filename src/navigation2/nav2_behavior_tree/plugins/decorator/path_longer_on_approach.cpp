@@ -58,6 +58,7 @@ bool PathLongerOnApproach::isNewPathLonger(
 
 inline BT::NodeStatus PathLongerOnApproach::tick()
 {
+  // 获取 new path, prox len 和 length factor
   getInput("path", new_path_);
   getInput("prox_len", prox_len_);
   getInput("length_factor", length_factor_);
@@ -70,6 +71,10 @@ inline BT::NodeStatus PathLongerOnApproach::tick()
 
   setStatus(BT::NodeStatus::RUNNING);
 
+  // path 更新了 &
+  // 老的 path 长度小于 prox len &
+  // 新的 path 比老的长 &
+  // 非第一次
   // Check if the path is updated and valid, compare the old and the new path length,
   // given the goal proximity and check if the new path is longer
   if (isPathUpdated(new_path_, old_path_) && isRobotInGoalProximity(old_path_, prox_len_) &&
@@ -90,6 +95,7 @@ inline BT::NodeStatus PathLongerOnApproach::tick()
         return BT::NodeStatus::FAILURE;
     }
   }
+  // 第一次更新 old path
   old_path_ = new_path_;
   first_time_ = false;
   return BT::NodeStatus::SUCCESS;

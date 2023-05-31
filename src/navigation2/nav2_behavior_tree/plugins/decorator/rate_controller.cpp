@@ -26,6 +26,7 @@ RateController::RateController(
 : BT::DecoratorNode(name, conf),
   first_time_(false)
 {
+  // 得到的 hz 即频率
   double hz = 1.0;
   getInput("hz", hz);
   period_ = 1.0 / hz;
@@ -33,6 +34,7 @@ RateController::RateController(
 
 BT::NodeStatus RateController::tick()
 {
+  // IDLE 获取开始时间
   if (status() == BT::NodeStatus::IDLE) {
     // Reset the starting point since we're starting a new iteration of
     // the rate controller (moving from IDLE to RUNNING)
@@ -42,14 +44,17 @@ BT::NodeStatus RateController::tick()
 
   setStatus(BT::NodeStatus::RUNNING);
 
+  // 计算持续时间
   // Determine how long its been since we've started this iteration
   auto now = std::chrono::high_resolution_clock::now();
   auto elapsed = now - start_;
 
+  // 将时间转换成秒
   // Now, get that in seconds
   typedef std::chrono::duration<float> float_seconds;
   auto seconds = std::chrono::duration_cast<float_seconds>(elapsed);
 
+  // 间隔指定时间 tick 一次
   // The child gets ticked the first time through and any time the period has
   // expired. In addition, once the child begins to run, it is ticked each time
   // 'til completion
@@ -64,6 +69,7 @@ BT::NodeStatus RateController::tick()
         return BT::NodeStatus::RUNNING;
 
       case BT::NodeStatus::SUCCESS:
+      // tick 完成的时候重置开始时间
         start_ = std::chrono::high_resolution_clock::now();  // Reset the timer
         return BT::NodeStatus::SUCCESS;
 

@@ -36,11 +36,13 @@ BT::NodeStatus SingleTrigger::tick()
 
   setStatus(BT::NodeStatus::RUNNING);
 
+  // 只 tick 一次
   if (first_time_) {
     const BT::NodeStatus child_state = child_node_->executeTick();
 
     switch (child_state) {
       case BT::NodeStatus::RUNNING:
+        // 只有在 RUNNING 的时候持续 tick 子节点
         return BT::NodeStatus::RUNNING;
 
       case BT::NodeStatus::SUCCESS:
@@ -57,6 +59,7 @@ BT::NodeStatus SingleTrigger::tick()
     }
   }
 
+  // 后续都不会 tick, 直接返回 FAILURE
   return BT::NodeStatus::FAILURE;
 }
 

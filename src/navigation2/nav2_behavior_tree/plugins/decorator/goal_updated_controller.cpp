@@ -37,25 +37,30 @@ BT::NodeStatus GoalUpdatedController::tick()
     // Reset since we're starting a new iteration of
     // the goal updated controller (moving from IDLE to RUNNING)
 
+    // 拿到 goals 和 goal
     config().blackboard->get<std::vector<geometry_msgs::msg::PoseStamped>>("goals", goals_);
     config().blackboard->get<geometry_msgs::msg::PoseStamped>("goal", goal_);
 
+    // 第一次获取便是 updated
     goal_was_updated_ = true;
   }
 
   setStatus(BT::NodeStatus::RUNNING);
 
+  // 拿到当前的 goals 和 goal
   std::vector<geometry_msgs::msg::PoseStamped> current_goals;
   config().blackboard->get<std::vector<geometry_msgs::msg::PoseStamped>>("goals", current_goals);
   geometry_msgs::msg::PoseStamped current_goal;
   config().blackboard->get<geometry_msgs::msg::PoseStamped>("goal", current_goal);
 
+  // 如果更新了则设置 updated
   if (goal_ != current_goal || goals_ != current_goals) {
     goal_ = current_goal;
     goals_ = current_goals;
     goal_was_updated_ = true;
   }
 
+  // 每一次更新则会 tick
   // The child gets ticked the first time through and any time the goal has
   // changed or preempted. In addition, once the child begins to run, it is ticked each time
   // 'til completion

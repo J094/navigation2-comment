@@ -33,6 +33,7 @@ BT::NodeStatus RecoveryNode::tick()
 {
   const unsigned children_count = children_nodes_.size();
 
+  // 只能有连个子节点
   if (children_count != 2) {
     throw BT::BehaviorTreeException("Recovery Node '" + name() + "' must only have 2 children.");
   }
@@ -46,6 +47,7 @@ BT::NodeStatus RecoveryNode::tick()
     if (current_child_idx_ == 0) {
       switch (child_status) {
         case BT::NodeStatus::SUCCESS:
+          // 只有第一个子节点成功才返回成功
           {
             // reset node and return success when first child returns success
             halt();
@@ -53,6 +55,8 @@ BT::NodeStatus RecoveryNode::tick()
           }
 
         case BT::NodeStatus::FAILURE:
+          // 第一个失败, 会继续 tick 第二个子节点
+          // 超过重试次数, 返回失败
           {
             if (retry_count_ < number_of_retries_) {
               // halt first child and tick second child in next iteration
@@ -80,6 +84,8 @@ BT::NodeStatus RecoveryNode::tick()
     } else if (current_child_idx_ == 1) {
       switch (child_status) {
         case BT::NodeStatus::SUCCESS:
+          // 如果第一个失败, tick 第二个子节点
+          // 第二个成功, 重试次数加一, 重新 tick 第一个子节点
           {
             // halt second child, increment recovery count, and tick first child in next iteration
             ControlNode::haltChild(1);
@@ -89,6 +95,7 @@ BT::NodeStatus RecoveryNode::tick()
           break;
 
         case BT::NodeStatus::FAILURE:
+          // 第二个也失败了, 那么整体失败
           {
             // reset node and return failure if second child fails
             halt();
@@ -108,6 +115,7 @@ BT::NodeStatus RecoveryNode::tick()
     }
   }  // end while loop
 
+  // 退出 loop 则证明 recovery 失败了, 没有返回成功
   // reset node and return failure
   halt();
   return BT::NodeStatus::FAILURE;

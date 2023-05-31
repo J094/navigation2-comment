@@ -6,5 +6,6 @@ ament_target_dependencies(test_bt_conversions ${dependencies})
 add_subdirectory(plugins/condition)
 # 测试 decorator 节点
 add_subdirectory(plugins/decorator)
+# 测试 control 节点
 add_subdirectory(plugins/control)
 add_subdirectory(plugins/action)

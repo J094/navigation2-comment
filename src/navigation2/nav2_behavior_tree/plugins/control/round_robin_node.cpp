@@ -37,12 +37,15 @@ BT::NodeStatus RoundRobinNode::tick()
 
   setStatus(BT::NodeStatus::RUNNING);
 
+  // 只要不是全部失败
   while (num_failed_children_ < num_children) {
     TreeNode * child_node = children_nodes_[current_child_idx_];
     const BT::NodeStatus child_status = child_node->executeTick();
 
     switch (child_status) {
       case BT::NodeStatus::SUCCESS:
+        // 一个成功成功
+        // 下一次从下一个子节点开始 tick
         {
           // Wrap around to the first child
           if (++current_child_idx_ >= num_children) {
@@ -74,6 +77,7 @@ BT::NodeStatus RoundRobinNode::tick()
     }
   }
 
+  // 所有都失败才返回失败
   halt();
   return BT::NodeStatus::FAILURE;
 }

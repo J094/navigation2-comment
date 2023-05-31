@@ -1,11 +1,14 @@
+# 测试 recovery 控制
 ament_add_gtest(test_control_recovery_node test_recovery_node.cpp)
 target_link_libraries(test_control_recovery_node nav2_recovery_node_bt_node)
 ament_target_dependencies(test_control_recovery_node ${dependencies})
 
+# 测试 pipeline sequence 控制
 ament_add_gtest(test_control_pipeline_sequence test_pipeline_sequence.cpp)
 target_link_libraries(test_control_pipeline_sequence nav2_pipeline_sequence_bt_node)
 ament_target_dependencies(test_control_pipeline_sequence ${dependencies})
 
+# 测试 round robin 控制
 ament_add_gtest(test_control_round_robin_node test_round_robin_node.cpp)
 target_link_libraries(test_control_round_robin_node nav2_round_robin_node_bt_node)
 ament_target_dependencies(test_control_round_robin_node ${dependencies})

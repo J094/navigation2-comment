@@ -33,7 +33,9 @@ GoalUpdater::GoalUpdater(
   const BT::NodeConfiguration & conf)
 : BT::DecoratorNode(name, conf)
 {
+  // 拿到节点
   node_ = config().blackboard->get<rclcpp::Node::SharedPtr>("node");
+  // 节点的回调只能同时执行一个
   callback_group_ = node_->create_callback_group(
     rclcpp::CallbackGroupType::MutuallyExclusive,
     false);
@@ -55,14 +57,18 @@ inline BT::NodeStatus GoalUpdater::tick()
 {
   geometry_msgs::msg::PoseStamped goal;
 
+  // 拿到 goal
   getInput("input_goal", goal);
 
   callback_group_executor_.spin_some();
 
+  // 如果最新拿到的 last goal received 时间晚于 goal
+  // 表示 goal 没有好好更新, 手动更新它
   if (rclcpp::Time(last_goal_received_.header.stamp) > rclcpp::Time(goal.header.stamp)) {
     goal = last_goal_received_;
   }
 
+  // 在黑板中输出 goal
   setOutput("output_goal", goal);
   return child_node_->executeTick();
 }
@@ -70,6 +76,7 @@ inline BT::NodeStatus GoalUpdater::tick()
 void
 GoalUpdater::callback_updated_goal(const geometry_msgs::msg::PoseStamped::SharedPtr msg)
 {
+  // 直接更新 last goal received
   last_goal_received_ = *msg;
 }
 
