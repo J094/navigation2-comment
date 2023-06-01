@@ -35,6 +35,7 @@ WaitAction::WaitAction(
     duration *= -1;
   }
 
+  // 设置 goal
   goal_.time.sec = duration;
 }
 

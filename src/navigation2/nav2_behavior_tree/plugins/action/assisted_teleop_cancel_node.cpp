@@ -28,6 +28,7 @@ AssistedTeleopCancel::AssistedTeleopCancel(
   const BT::NodeConfiguration & conf)
 : BtCancelActionNode<nav2_msgs::action::AssistedTeleop>(xml_tag_name, action_name, conf)
 {
+  // cancel 的是 AssistedTeleop
 }
 
 }  // namespace nav2_behavior_tree

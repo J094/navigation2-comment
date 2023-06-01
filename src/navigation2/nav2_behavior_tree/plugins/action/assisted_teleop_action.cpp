@@ -30,12 +30,14 @@ AssistedTeleopAction::AssistedTeleopAction(
   getInput("time_allowance", time_allowance);
   getInput("is_recovery", is_recovery_);
 
+  // 设置 goal
   // Populate the input message
   goal_.time_allowance = rclcpp::Duration::from_seconds(time_allowance);
 }
 
 void AssistedTeleopAction::on_tick()
 {
+  // 恢复模式下进行恢复计数
   if (is_recovery_) {
     increment_recovery_count();
   }
@@ -43,6 +45,7 @@ void AssistedTeleopAction::on_tick()
 
 BT::NodeStatus AssistedTeleopAction::on_aborted()
 {
+  // abort 根据是否在恢复模式决定
   return is_recovery_ ? BT::NodeStatus::FAILURE : BT::NodeStatus::SUCCESS;
 }
 

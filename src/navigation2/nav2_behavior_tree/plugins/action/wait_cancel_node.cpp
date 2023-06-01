@@ -28,6 +28,7 @@ WaitCancel::WaitCancel(
   const BT::NodeConfiguration & conf)
 : BtCancelActionNode<nav2_msgs::action::Wait>(xml_tag_name, action_name, conf)
 {
+  // 这里 cancel 的是 Wait
 }
 
 }  // namespace nav2_behavior_tree

@@ -30,12 +30,14 @@ NavigateToPoseAction::NavigateToPoseAction(
 
 void NavigateToPoseAction::on_tick()
 {
+  // 拿 goal
   if (!getInput("goal", goal_.pose)) {
     RCLCPP_ERROR(
       node_->get_logger(),
       "NavigateToPoseAction: goal not provided");
     return;
   }
+  // 拿行为树, 这一个动作是一系列节点组成的
   getInput("behavior_tree", goal_.behavior_tree);
 }
 

@@ -30,8 +30,10 @@ ComputePathToPoseAction::ComputePathToPoseAction(
 
 void ComputePathToPoseAction::on_tick()
 {
+  // 拿 goal
   getInput("goal", goal_.goal);
   getInput("planner_id", goal_.planner_id);
+  // 如果有开始位姿, 就拿开始位姿
   if (getInput("start", goal_.start)) {
     goal_.use_start = true;
   }
@@ -39,12 +41,14 @@ void ComputePathToPoseAction::on_tick()
 
 BT::NodeStatus ComputePathToPoseAction::on_success()
 {
+  // 成功了就把 path 放到黑板中
   setOutput("path", result_.result->path);
   return BT::NodeStatus::SUCCESS;
 }
 
 BT::NodeStatus ComputePathToPoseAction::on_aborted()
 {
+  // abort 就把空路径放到 path 中, 返回失败
   nav_msgs::msg::Path empty_path;
   setOutput("path", empty_path);
   return BT::NodeStatus::FAILURE;
@@ -52,6 +56,7 @@ BT::NodeStatus ComputePathToPoseAction::on_aborted()
 
 BT::NodeStatus ComputePathToPoseAction::on_cancelled()
 {
+  // abort 就把空路径放到 path 中, 返回成功
   nav_msgs::msg::Path empty_path;
   setOutput("path", empty_path);
   return BT::NodeStatus::SUCCESS;
@@ -59,6 +64,7 @@ BT::NodeStatus ComputePathToPoseAction::on_cancelled()
 
 void ComputePathToPoseAction::halt()
 {
+  // halt 就把空路径放到 path 中, 
   nav_msgs::msg::Path empty_path;
   setOutput("path", empty_path);
   BtActionNode::halt();

@@ -49,21 +49,25 @@ public:
     const BT::NodeConfiguration & conf)
   : BT::ActionNodeBase(xml_tag_name, conf), action_name_(action_name)
   {
+    // 获取 ros 节点, 创建 callback 管理
     node_ = config().blackboard->template get<rclcpp::Node::SharedPtr>("node");
     callback_group_ = node_->create_callback_group(
       rclcpp::CallbackGroupType::MutuallyExclusive,
       false);
     callback_group_executor_.add_callback_group(callback_group_, node_->get_node_base_interface());
 
+    // 获取超时时间
     // Get the required items from the blackboard
     server_timeout_ =
       config().blackboard->template get<std::chrono::milliseconds>("server_timeout");
     getInput<std::chrono::milliseconds>("server_timeout", server_timeout_);
 
+    // 获取 remapped 名字
     std::string remapped_action_name;
     if (getInput("server_name", remapped_action_name)) {
       action_name_ = remapped_action_name;
     }
+    // 创建 action client 执行具体操作
     createActionClient(action_name_);
 
     // Give the derive class a chance to do any initialization
@@ -84,9 +88,11 @@ public:
    */
   void createActionClient(const std::string & action_name)
   {
+    // 创建 action client
     // Now that we have the ROS node to use, create the action client for this BT action
     action_client_ = rclcpp_action::create_client<ActionT>(node_, action_name, callback_group_);
 
+    // 确保服务存在
     // Make sure the server is actually there before continuing
     RCLCPP_DEBUG(node_->get_logger(), "Waiting for \"%s\" action server", action_name.c_str());
     if (!action_client_->wait_for_action_server(1s)) {
@@ -135,16 +141,20 @@ public:
    */
   BT::NodeStatus tick() override
   {
+    // 直接设置 RUNNING
     // setting the status to RUNNING to notify the BT Loggers (if any)
     setStatus(BT::NodeStatus::RUNNING);
 
+    // 删除当前时间 10ms 前的所有 goals, 避免异步通讯错误
     // Cancel all the goals specified before 10ms from current time
     // to avoid async communication error
 
     rclcpp::Time goal_expiry_time = node_->now() - std::chrono::milliseconds(10);
 
+    // 拿到 future_cancel
     auto future_cancel = action_client_->async_cancel_goals_before(goal_expiry_time);
 
+    // 等到 future_cancel 请求完成, 并返回成功, 否则返回失败
     if (callback_group_executor_.spin_until_future_complete(future_cancel, server_timeout_) !=
       rclcpp::FutureReturnCode::SUCCESS)
     {
@@ -158,8 +168,10 @@ public:
 
 protected:
   std::string action_name_;
+  // action 客户
   typename std::shared_ptr<rclcpp_action::Client<ActionT>> action_client_;
 
+  // ros 节点来执行操作
   // The node that will be used for any ROS operations
   rclcpp::Node::SharedPtr node_;
   rclcpp::CallbackGroup::SharedPtr callback_group_;

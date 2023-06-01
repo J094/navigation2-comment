@@ -30,12 +30,14 @@ NavigateThroughPosesAction::NavigateThroughPosesAction(
 
 void NavigateThroughPosesAction::on_tick()
 {
+  // 拿 goals
   if (!getInput("goals", goal_.poses)) {
     RCLCPP_ERROR(
       node_->get_logger(),
       "NavigateThroughPosesAction: goal not provided");
     return;
   }
+  // 拿行为树, 这是一系列行为
   getInput("behavior_tree", goal_.behavior_tree);
 }
 

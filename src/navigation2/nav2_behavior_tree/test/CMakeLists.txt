@@ -8,4 +8,5 @@ add_subdirectory(plugins/condition)
 add_subdirectory(plugins/decorator)
 # 测试 control 节点
 add_subdirectory(plugins/control)
+# 测试 action 节点
 add_subdirectory(plugins/action)

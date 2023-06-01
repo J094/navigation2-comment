@@ -31,6 +31,7 @@ SmoothPathAction::SmoothPathAction(
 
 void SmoothPathAction::on_tick()
 {
+  // 拿 path
   getInput("unsmoothed_path", goal_.path);
   getInput("smoother_id", goal_.smoother_id);
   double max_smoothing_duration;
@@ -41,6 +42,7 @@ void SmoothPathAction::on_tick()
 
 BT::NodeStatus SmoothPathAction::on_success()
 {
+  // 成功后把平滑后的路径放到黑板中
   setOutput("smoothed_path", result_.result->path);
   setOutput("smoothing_duration", rclcpp::Duration(result_.result->smoothing_duration).seconds());
   setOutput("was_completed", result_.result->was_completed);

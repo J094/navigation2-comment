@@ -34,6 +34,7 @@ TruncatePathLocal::TruncatePathLocal(
   const BT::NodeConfiguration & conf)
 : BT::ActionNodeBase(name, conf)
 {
+  // 拿到 tf_buffer_
   tf_buffer_ =
     config().blackboard->template get<std::shared_ptr<tf2_ros::Buffer>>(
     "tf_buffer");
@@ -48,11 +49,15 @@ inline BT::NodeStatus TruncatePathLocal::tick()
   double angular_distance_weight;
   double max_robot_pose_search_dist;
 
+  // 拿参数
   getInput("distance_forward", distance_forward);
   getInput("distance_backward", distance_backward);
   getInput("angular_distance_weight", angular_distance_weight);
   getInput("max_robot_pose_search_dist", max_robot_pose_search_dist);
 
+  // 如果最大为无穷, 剪枝 path
+  // NOTE: 最大搜索距离为无穷才剪枝? 感觉不对劲
+  // NOTE: closest_pose_detection_begin_ 在哪里初始化, 如果 path_pruning 的话
   bool path_pruning = std::isfinite(max_robot_pose_search_dist);
   nav_msgs::msg::Path new_path;
   getInput("input_path", new_path);
@@ -61,21 +66,28 @@ inline BT::NodeStatus TruncatePathLocal::tick()
     closest_pose_detection_begin_ = path_.poses.begin();
   }
 
+  // 拿机器人位姿
   if (!getRobotPose(path_.header.frame_id, pose)) {
     return BT::NodeStatus::FAILURE;
   }
 
+  // 如果为空, 不做处理
   if (path_.poses.empty()) {
     setOutput("output_path", path_);
     return BT::NodeStatus::SUCCESS;
   }
 
   auto closest_pose_detection_end = path_.poses.end();
+  // 剪枝 path
+  // 返回距离现在到最大探测距离的 pose
+  // NOTE: 如果 max_robot_pose_search_dist 是无穷的话, 不就是直接返回最后一个 pose
   if (path_pruning) {
     closest_pose_detection_end = nav2_util::geometry_utils::first_after_integrated_distance(
       closest_pose_detection_begin_, path_.poses.end(), max_robot_pose_search_dist);
   }
 
+  // 当前位姿到 poses 中的位姿的距离作为比较
+  // current_pose 取离当前位姿最近的 pose
   // find the closest pose on the path
   auto current_pose = nav2_util::geometry_utils::min_by(
     closest_pose_detection_begin_, closest_pose_detection_end,
@@ -83,19 +95,23 @@ inline BT::NodeStatus TruncatePathLocal::tick()
       return poseDistance(pose, ps, angular_distance_weight);
     });
 
+  // 剪枝的话更新当前位置为最近检测位姿
   if (path_pruning) {
     closest_pose_detection_begin_ = current_pose;
   }
 
+  // 找到向前的 pose 终点
   // expand forwards to extract desired length
   auto forward_pose_it = nav2_util::geometry_utils::first_after_integrated_distance(
     current_pose, path_.poses.end(), distance_forward);
 
+  // 找到向后的 pose 终点
   // expand backwards to extract desired length
   // Note: current_pose + 1 is used because reverse iterator points to a cell before it
   auto backward_pose_it = nav2_util::geometry_utils::first_after_integrated_distance(
     std::reverse_iterator(current_pose + 1), path_.poses.rend(), distance_backward);
 
+  // 从后到前重新构建 path 输出
   nav_msgs::msg::Path output_path;
   output_path.header = path_.header;
   output_path.poses = std::vector<geometry_msgs::msg::PoseStamped>(
@@ -108,6 +124,7 @@ inline BT::NodeStatus TruncatePathLocal::tick()
 inline bool TruncatePathLocal::getRobotPose(
   std::string path_frame_id, geometry_msgs::msg::PoseStamped & pose)
 {
+  // 拿 pose
   if (!getInput("pose", pose)) {
     std::string robot_frame;
     if (!getInput("robot_frame", robot_frame)) {

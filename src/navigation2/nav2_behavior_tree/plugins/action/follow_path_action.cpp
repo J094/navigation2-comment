@@ -30,6 +30,7 @@ FollowPathAction::FollowPathAction(
 
 void FollowPathAction::on_tick()
 {
+  // 拿 path
   getInput("path", goal_.path);
   getInput("controller_id", goal_.controller_id);
   getInput("goal_checker_id", goal_.goal_checker_id);
@@ -38,10 +39,12 @@ void FollowPathAction::on_tick()
 void FollowPathAction::on_wait_for_result(
   std::shared_ptr<const nav2_msgs::action::FollowPath::Feedback>/*feedback*/)
 {
+  // 拿新的 path
   // Grab the new path
   nav_msgs::msg::Path new_path;
   getInput("path", new_path);
 
+  // 检查 path 是否变动过
   // Check if it is not same with the current one
   if (goal_.path != new_path) {
     // the action server on the next loop iteration
@@ -49,6 +52,7 @@ void FollowPathAction::on_wait_for_result(
     goal_updated_ = true;
   }
 
+  // 检查是否变动过
   std::string new_controller_id;
   getInput("controller_id", new_controller_id);
 
@@ -57,6 +61,7 @@ void FollowPathAction::on_wait_for_result(
     goal_updated_ = true;
   }
 
+  // 检查是否变动过s
   std::string new_goal_checker_id;
   getInput("goal_checker_id", new_goal_checker_id);
 

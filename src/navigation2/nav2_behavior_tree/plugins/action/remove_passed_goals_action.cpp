@@ -43,6 +43,7 @@ inline BT::NodeStatus RemovePassedGoals::tick()
 {
   setStatus(BT::NodeStatus::RUNNING);
 
+  // 拿 goal_poses
   Goals goal_poses;
   getInput("input_goals", goal_poses);
 
@@ -53,6 +54,7 @@ inline BT::NodeStatus RemovePassedGoals::tick()
 
   using namespace nav2_util::geometry_utils;  // NOLINT
 
+  // 拿当前位姿
   geometry_msgs::msg::PoseStamped current_pose;
   if (!nav2_util::getCurrentPose(
       current_pose, *tf_, global_frame_, robot_base_frame_,
@@ -61,6 +63,8 @@ inline BT::NodeStatus RemovePassedGoals::tick()
     return BT::NodeStatus::FAILURE;
   }
 
+  // 这里从 goals 的开始不断计算经过的 goal 距离当前位姿
+  // 如果距离大于半径就从头开始删除
   double dist_to_goal;
   while (goal_poses.size() > 1) {
     dist_to_goal = euclidean_distance(goal_poses[0].pose, current_pose.pose);
@@ -72,6 +76,7 @@ inline BT::NodeStatus RemovePassedGoals::tick()
     goal_poses.erase(goal_poses.begin());
   }
 
+  // 删除后的 poses 输出
   setOutput("output_goals", goal_poses);
 
   return BT::NodeStatus::SUCCESS;

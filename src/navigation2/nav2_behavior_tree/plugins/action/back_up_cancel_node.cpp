@@ -28,6 +28,7 @@ BackUpCancel::BackUpCancel(
   const BT::NodeConfiguration & conf)
 : BtCancelActionNode<nav2_msgs::action::BackUp>(xml_tag_name, action_name, conf)
 {
+  // cancel 的是  BackUp
 }
 
 }  // namespace nav2_behavior_tree

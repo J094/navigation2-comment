@@ -84,10 +84,12 @@ private:
   void callbackPlannerSelect(const std_msgs::msg::String::SharedPtr msg);
 
 
+  // 订阅
   rclcpp::Subscription<std_msgs::msg::String>::SharedPtr planner_selector_sub_;
 
   std::string last_selected_planner_;
 
+  // ros 节点
   rclcpp::Node::SharedPtr node_;
   rclcpp::CallbackGroup::SharedPtr callback_group_;
   rclcpp::executors::SingleThreadedExecutor callback_group_executor_;

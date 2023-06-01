@@ -31,6 +31,7 @@ ComputePathThroughPosesAction::ComputePathThroughPosesAction(
 
 void ComputePathThroughPosesAction::on_tick()
 {
+  // 拿 goals
   getInput("goals", goal_.goals);
   getInput("planner_id", goal_.planner_id);
   if (getInput("start", goal_.start)) {
@@ -40,12 +41,14 @@ void ComputePathThroughPosesAction::on_tick()
 
 BT::NodeStatus ComputePathThroughPosesAction::on_success()
 {
+  // 如果成功了把 path 放到黑板里
   setOutput("path", result_.result->path);
   return BT::NodeStatus::SUCCESS;
 }
 
 BT::NodeStatus ComputePathThroughPosesAction::on_aborted()
 {
+  // abort 空路径
   nav_msgs::msg::Path empty_path;
   setOutput("path", empty_path);
   return BT::NodeStatus::FAILURE;
@@ -53,6 +56,7 @@ BT::NodeStatus ComputePathThroughPosesAction::on_aborted()
 
 BT::NodeStatus ComputePathThroughPosesAction::on_cancelled()
 {
+  // cancel 空路径
   nav_msgs::msg::Path empty_path;
   setOutput("path", empty_path);
   return BT::NodeStatus::SUCCESS;

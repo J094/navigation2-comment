@@ -72,6 +72,7 @@ public:
   {
     return providedBasicPorts(
       {
+        // 要输出 path, 输入 goals, start 等
         BT::OutputPort<nav_msgs::msg::Path>("path", "Path created by ComputePathThroughPoses node"),
         BT::InputPort<std::vector<geometry_msgs::msg::PoseStamped>>(
           "goals",

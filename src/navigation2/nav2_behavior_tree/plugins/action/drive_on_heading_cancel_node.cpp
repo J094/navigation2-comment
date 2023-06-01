@@ -28,6 +28,7 @@ DriveOnHeadingCancel::DriveOnHeadingCancel(
   const BT::NodeConfiguration & conf)
 : BtCancelActionNode<nav2_msgs::action::DriveOnHeading>(xml_tag_name, action_name, conf)
 {
+  // cancel 的是 DriveOnHeading
 }
 
 }  // namespace nav2_behavior_tree

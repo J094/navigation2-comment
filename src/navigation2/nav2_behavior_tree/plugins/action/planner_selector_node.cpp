@@ -32,6 +32,7 @@ PlannerSelector::PlannerSelector(
   const BT::NodeConfiguration & conf)
 : BT::SyncActionNode(name, conf)
 {
+  // 拿到节点, 管理回调
   node_ = config().blackboard->get<rclcpp::Node::SharedPtr>("node");
   callback_group_ = node_->create_callback_group(
     rclcpp::CallbackGroupType::MutuallyExclusive,
@@ -43,6 +44,7 @@ PlannerSelector::PlannerSelector(
   rclcpp::QoS qos(rclcpp::KeepLast(1));
   qos.transient_local().reliable();
 
+  // 创建订阅
   rclcpp::SubscriptionOptions sub_option;
   sub_option.callback_group = callback_group_;
   planner_selector_sub_ = node_->create_subscription<std_msgs::msg::String>(
@@ -54,8 +56,10 @@ PlannerSelector::PlannerSelector(
 
 BT::NodeStatus PlannerSelector::tick()
 {
+  // 等等订阅回调
   callback_group_executor_.spin_some();
 
+  // 如果为空, 用默认规划器
   // This behavior always use the last selected planner received from the topic input.
   // When no input is specified it uses the default planner.
   // If the default planner is not specified then we work in "required planner mode":
@@ -71,6 +75,7 @@ BT::NodeStatus PlannerSelector::tick()
     }
   }
 
+  // 输出 planner 到 selected_planner
   setOutput("selected_planner", last_selected_planner_);
 
   return BT::NodeStatus::SUCCESS;
@@ -79,6 +84,7 @@ BT::NodeStatus PlannerSelector::tick()
 void
 PlannerSelector::callbackPlannerSelect(const std_msgs::msg::String::SharedPtr msg)
 {
+  // 拿到数据保存
   last_selected_planner_ = msg->data;
 }
 

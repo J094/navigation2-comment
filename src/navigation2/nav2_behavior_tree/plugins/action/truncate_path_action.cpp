@@ -33,15 +33,18 @@ TruncatePath::TruncatePath(
 : BT::ActionNodeBase(name, conf),
   distance_(1.0)
 {
+  // 拿距离
   getInput("distance", distance_);
 }
 
+// inline 在函数被调用的时候内联, 插入代码
 inline BT::NodeStatus TruncatePath::tick()
 {
   setStatus(BT::NodeStatus::RUNNING);
 
   nav_msgs::msg::Path input_path;
 
+  // 拿输入 path
   getInput("input_path", input_path);
 
   if (input_path.poses.empty()) {
@@ -49,17 +52,20 @@ inline BT::NodeStatus TruncatePath::tick()
     return BT::NodeStatus::SUCCESS;
   }
 
+  // 直接在这里处理切掉一些 poses
   geometry_msgs::msg::PoseStamped final_pose = input_path.poses.back();
 
   double distance_to_goal = nav2_util::geometry_utils::euclidean_distance(
     input_path.poses.back(), final_pose);
 
+  // 如果距离小于 distance_, 剩余的 poses 多余两个, 可以把最后一个丢掉
   while (distance_to_goal < distance_ && input_path.poses.size() > 2) {
     input_path.poses.pop_back();
     distance_to_goal = nav2_util::geometry_utils::euclidean_distance(
       input_path.poses.back(), final_pose);
   }
 
+  // 切除掉一些 poses 后, 计算最后朝向目标点
   double dx = final_pose.pose.position.x - input_path.poses.back().pose.position.x;
   double dy = final_pose.pose.position.y - input_path.poses.back().pose.position.y;
 

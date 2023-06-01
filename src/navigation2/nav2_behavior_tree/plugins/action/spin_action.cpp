@@ -30,16 +30,20 @@ SpinAction::SpinAction(
   getInput("spin_dist", dist);
   double time_allowance;
   getInput("time_allowance", time_allowance);
+  // 设置 goal_
   goal_.target_yaw = dist;
   goal_.time_allowance = rclcpp::Duration::from_seconds(time_allowance);
   getInput("is_recovery", is_recovery_);
 }
 
+// 只重载了 on_tick()
 void SpinAction::on_tick()
 {
+  // 这里加 recovery 的次数
   if (is_recovery_) {
     increment_recovery_count();
   }
+  // 具体的操作应该交给服务去做
 }
 
 }  // namespace nav2_behavior_tree

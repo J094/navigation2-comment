@@ -47,12 +47,14 @@ public:
     const BT::NodeConfiguration & conf)
   : BT::ActionNodeBase(service_node_name, conf), service_node_name_(service_node_name)
   {
+    // 节点和回调
     node_ = config().blackboard->template get<rclcpp::Node::SharedPtr>("node");
     callback_group_ = node_->create_callback_group(
       rclcpp::CallbackGroupType::MutuallyExclusive,
       false);
     callback_group_executor_.add_callback_group(callback_group_, node_->get_node_base_interface());
 
+    // 时间阈值
     // Get the required items from the blackboard
     bt_loop_duration_ =
       config().blackboard->template get<std::chrono::milliseconds>("bt_loop_duration");
@@ -60,6 +62,7 @@ public:
       config().blackboard->template get<std::chrono::milliseconds>("server_timeout");
     getInput<std::chrono::milliseconds>("server_timeout", server_timeout_);
 
+    // 服务名和创建客户
     // Now that we have node_ to use, create the service client for this BT service
     getInput("service_name", service_name_);
     service_client_ = node_->create_client<ServiceT>(
@@ -67,9 +70,11 @@ public:
       rclcpp::ServicesQoS().get_rmw_qos_profile(),
       callback_group_);
 
+    // 服务请求
     // Make a request for the service without parameter
     request_ = std::make_shared<typename ServiceT::Request>();
 
+    // 确保服务可用
     // Make sure the server is actually there before continuing
     RCLCPP_DEBUG(
       node_->get_logger(), "Waiting for \"%s\" service",
@@ -127,6 +132,7 @@ public:
    */
   BT::NodeStatus tick() override
   {
+    // 没有发送请求就 tick, 拿到 future_result_
     if (!request_sent_) {
       on_tick();
       future_result_ = service_client_->async_send_request(request_).share();
@@ -170,21 +176,27 @@ public:
    */
   virtual BT::NodeStatus check_future()
   {
+    // 经过的时间
     auto elapsed = (node_->now() - sent_time_).to_chrono<std::chrono::milliseconds>();
     auto remaining = server_timeout_ - elapsed;
 
     if (remaining > std::chrono::milliseconds(0)) {
       auto timeout = remaining > bt_loop_duration_ ? bt_loop_duration_ : remaining;
 
+      // 每次等待 timeout 时间获取结果
       rclcpp::FutureReturnCode rc;
       rc = callback_group_executor_.spin_until_future_complete(future_result_, timeout);
+      // 如果成功了返回成功
       if (rc == rclcpp::FutureReturnCode::SUCCESS) {
         request_sent_ = false;
+        // 成功了进行自定义操作
         BT::NodeStatus status = on_completion(future_result_.get());
         return status;
       }
 
+      // 如果超时了, 并且没有超过 service_timeout_ 继续等待
       if (rc == rclcpp::FutureReturnCode::TIMEOUT) {
+        // 再继续等待的过程中进行自定义操作
         on_wait_for_result();
         elapsed = (node_->now() - sent_time_).to_chrono<std::chrono::milliseconds>();
         if (elapsed < server_timeout_) {
@@ -193,6 +205,7 @@ public:
       }
     }
 
+    // 如果彻底超时, 返回失败
     RCLCPP_WARN(
       node_->get_logger(),
       "Node timed out while executing service call to %s.", service_name_.c_str());
@@ -220,10 +233,12 @@ protected:
     config().blackboard->template set<int>("number_recoveries", recovery_count);  // NOLINT
   }
 
+  // ros 服务
   std::string service_name_, service_node_name_;
   typename std::shared_ptr<rclcpp::Client<ServiceT>> service_client_;
   std::shared_ptr<typename ServiceT::Request> request_;
 
+  // ros 节点
   // The node that will be used for any ROS operations
   rclcpp::Node::SharedPtr node_;
   rclcpp::CallbackGroup::SharedPtr callback_group_;
@@ -236,6 +251,7 @@ protected:
   // The timeout value for BT loop execution
   std::chrono::milliseconds bt_loop_duration_;
 
+  // 服务响应
   // To track the server response when a new request is sent
   std::shared_future<typename ServiceT::Response::SharedPtr> future_result_;
   bool request_sent_{false};

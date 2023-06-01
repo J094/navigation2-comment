@@ -33,6 +33,7 @@ BackUpAction::BackUpAction(
   double time_allowance;
   getInput("time_allowance", time_allowance);
 
+  // 设置 goal_
   // Populate the input message
   goal_.target.x = dist;
   goal_.target.y = 0.0;

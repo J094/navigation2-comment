@@ -29,6 +29,7 @@ ClearEntireCostmapService::ClearEntireCostmapService(
 
 void ClearEntireCostmapService::on_tick()
 {
+  // 清空 costmap 本身属于 recovery
   increment_recovery_count();
 }
 
@@ -41,6 +42,7 @@ ClearCostmapExceptRegionService::ClearCostmapExceptRegionService(
 
 void ClearCostmapExceptRegionService::on_tick()
 {
+  // 属于 recovery
   getInput("reset_distance", request_->reset_distance);
   increment_recovery_count();
 }
@@ -54,6 +56,7 @@ ClearCostmapAroundRobotService::ClearCostmapAroundRobotService(
 
 void ClearCostmapAroundRobotService::on_tick()
 {
+  // 输入 recovery
   getInput("reset_distance", request_->reset_distance);
   increment_recovery_count();
 }
