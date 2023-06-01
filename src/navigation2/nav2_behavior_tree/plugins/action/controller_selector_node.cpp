@@ -32,6 +32,7 @@ ControllerSelector::ControllerSelector(
   const BT::NodeConfiguration & conf)
 : BT::SyncActionNode(name, conf)
 {
+  // 节点和回调管理
   node_ = config().blackboard->get<rclcpp::Node::SharedPtr>("node");
   callback_group_ = node_->create_callback_group(
     rclcpp::CallbackGroupType::MutuallyExclusive,
@@ -43,6 +44,7 @@ ControllerSelector::ControllerSelector(
   rclcpp::QoS qos(rclcpp::KeepLast(1));
   qos.transient_local().reliable();
 
+  // 创建订阅
   rclcpp::SubscriptionOptions sub_option;
   sub_option.callback_group = callback_group_;
   controller_selector_sub_ = node_->create_subscription<std_msgs::msg::String>(
@@ -71,6 +73,7 @@ BT::NodeStatus ControllerSelector::tick()
     }
   }
 
+  // tick 这里向外输出选择的 controller
   setOutput("selected_controller", last_selected_controller_);
 
   return BT::NodeStatus::SUCCESS;
@@ -79,6 +82,7 @@ BT::NodeStatus ControllerSelector::tick()
 void
 ControllerSelector::callbackControllerSelect(const std_msgs::msg::String::SharedPtr msg)
 {
+  // 拿选择的 controller
   last_selected_controller_ = msg->data;
 }
 

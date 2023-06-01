@@ -118,14 +118,17 @@ ament_add_gtest(test_planner_selector_node test_planner_selector_node.cpp)
 target_link_libraries(test_planner_selector_node nav2_planner_selector_bt_node)
 ament_target_dependencies(test_planner_selector_node ${dependencies})
 
+# 测试 controller selector 动作
 ament_add_gtest(test_controller_selector_node test_controller_selector_node.cpp)
 target_link_libraries(test_controller_selector_node nav2_controller_selector_bt_node)
 ament_target_dependencies(test_controller_selector_node ${dependencies})
 
+# 测试 smoother selector 动作
 ament_add_gtest(test_smoother_selector_node test_smoother_selector_node.cpp)
 target_link_libraries(test_smoother_selector_node nav2_smoother_selector_bt_node)
 ament_target_dependencies(test_smoother_selector_node ${dependencies})
 
+# 测试 goal checker selector 动作
 ament_add_gtest(test_goal_checker_selector_node test_goal_checker_selector_node.cpp)
 target_link_libraries(test_goal_checker_selector_node nav2_goal_checker_selector_bt_node)
 ament_target_dependencies(test_goal_checker_selector_node ${dependencies})
