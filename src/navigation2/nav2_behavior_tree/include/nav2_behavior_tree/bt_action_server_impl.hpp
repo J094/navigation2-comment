@@ -48,6 +48,8 @@ BtActionServer<ActionT>::BtActionServer(
   on_preempt_callback_(on_preempt_callback),
   on_completion_callback_(on_completion_callback)
 {
+  // lock 临时通过 weak_ptr 生成 shared_ptr
+  // node 会被自动释放
   auto node = node_.lock();
   logger_ = node->get_logger();
   clock_ = node->get_clock();
@@ -68,6 +70,7 @@ BtActionServer<ActionT>::~BtActionServer()
 template<class ActionT>
 bool BtActionServer<ActionT>::on_configure()
 {
+  // 生成临时 shared_ptr
   auto node = node_.lock();
   if (!node) {
     throw std::runtime_error{"Failed to lock node"};
@@ -84,6 +87,7 @@ bool BtActionServer<ActionT>::on_configure()
       std::string(node->get_name()) + "_" + client_node_name + "_rclcpp_node",
       "--"});
 
+  // client_node_ 原来在此, 最后会被放到黑板的 "node" 中
   // Support for handling the topic-based goal pose from rviz
   client_node_ = std::make_shared<rclcpp::Node>("_", options);
 
