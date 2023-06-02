@@ -37,11 +37,13 @@ template<typename ActionT>
 class SimpleActionServer
 {
 public:
+  // 主要工作在这里完成
   // Callback function to complete main work. This should itself deal with its
   // own exceptions, but if for some reason one is thrown, it will be caught
   // in SimpleActionServer and terminate the action itself.
   typedef std::function<void ()> ExecuteCallback;
 
+  // 完成工作在这里通知
   // Callback function to notify the user that an exception was thrown that
   // the simple action server caught (or another failure) and the action was
   // terminated. To avoid using, catch exceptions in your application such that
@@ -106,10 +108,12 @@ public:
     spin_thread_(spin_thread)
   {
     using namespace std::placeholders;  // NOLINT
+    // 同时只允许一个回调执行
     if (spin_thread_) {
       callback_group_ = node_base_interface->create_callback_group(
         rclcpp::CallbackGroupType::MutuallyExclusive, false);
     }
+    // 创建 ros action 服务
     action_server_ = rclcpp_action::create_server<ActionT>(
       node_base_interface_,
       node_clock_interface_,
@@ -121,6 +125,7 @@ public:
       std::bind(&SimpleActionServer::handle_accepted, this, _1),
       options,
       callback_group_);
+    // 设置回调执行
     if (spin_thread_) {
       executor_ = std::make_shared<rclcpp::executors::SingleThreadedExecutor>();
       executor_->add_callback_group(callback_group_, node_base_interface_);
@@ -128,6 +133,7 @@ public:
     }
   }
 
+  // 总是接受 goal
   /**
    * @brief handle the goal requested: accept or reject. This implementation always accepts.
    * @param uuid Goal ID
@@ -138,6 +144,7 @@ public:
     const rclcpp_action::GoalUUID & /*uuid*/,
     std::shared_ptr<const typename ActionT::Goal>/*goal*/)
   {
+    // lock_guard 在作用域内自动管理解锁
     std::lock_guard<std::recursive_mutex> lock(update_mutex_);
 
     if (!server_active_) {
@@ -170,6 +177,7 @@ public:
     return rclcpp_action::CancelResponse::ACCEPT;
   }
 
+  // 处理接受的 goals, 把他们添加到优先级队列中
   /**
    * @brief Handles accepted goals and adds to preempted queue to switch to
    * @param Goal A server goal handle to cancel
@@ -180,28 +188,38 @@ public:
     debug_msg("Receiving a new goal");
 
     if (is_active(current_handle_) || is_running()) {
+      // 老的 goal 还没完成, 把新的 goal 放到 pending 里
       debug_msg("An older goal is active, moving the new goal to a pending slot.");
 
       if (is_active(pending_handle_)) {
+        // 如果 pending goal 也在进行中, 终结 pending goal
         debug_msg(
           "The pending slot is occupied."
           " The previous pending goal will be terminated and replaced.");
         terminate(pending_handle_);
       }
+      // 把 handle 给 pending
       pending_handle_ = handle;
       preempt_requested_ = true;
     } else {
       if (is_active(pending_handle_)) {
+        // 这里不应该在当前 goal 没有开始的情况下进行 pending goal
         // Shouldn't reach a state with a pending goal but no current one.
         error_msg("Forgot to handle a preemption. Terminating the pending goal.");
         terminate(pending_handle_);
         preempt_requested_ = false;
       }
 
+      // 把 handle 给 current
       current_handle_ = handle;
 
+      // 快速返回, 避免阻塞 executor
       // Return quickly to avoid blocking the executor, so spin up a new thread
       debug_msg("Executing goal asynchronously.");
+      // NOTE: std::async 创建一个异步任务, 在新的线程中运行
+      // lambda 函数, 获取 this 指针, 调用 work()
+      // 返回的是一个 std::future 对象, 用来获取异步任务的结果, 这里就是 work 方法的结果
+      // 后续可以通过 execution_future_.get() 来获取结果
       execution_future_ = std::async(std::launch::async, [this]() {work();});
     }
   }
@@ -213,7 +231,9 @@ public:
   {
     while (rclcpp::ok() && !stop_execution_ && is_active(current_handle_)) {
       debug_msg("Executing the goal...");
+      // 执行 goal
       try {
+        // 这里执行用户定义的函数
         execute_callback_();
       } catch (std::exception & ex) {
         RCLCPP_ERROR(
@@ -234,6 +254,7 @@ public:
         break;
       }
 
+      // 完成执行之后应该结束 current_handle
       if (is_active(current_handle_)) {
         warn_msg("Current goal was not completed successfully.");
         terminate(current_handle_);
@@ -242,12 +263,14 @@ public:
 
       if (is_active(pending_handle_)) {
         debug_msg("Executing a pending handle on the existing thread.");
+        // 执行 pending goal
         accept_pending_goal();
       } else {
         debug_msg("Done processing available goals.");
         break;
       }
     }
+    // 线程完成
     debug_msg("Worker thread done.");
   }
 
@@ -288,6 +311,7 @@ public:
     auto start_time = steady_clock::now();
     while (execution_future_.wait_for(milliseconds(100)) != std::future_status::ready) {
       info_msg("Waiting for async process to finish.");
+      // 超时处理
       if (steady_clock::now() - start_time >= server_timeout_) {
         terminate_all();
         completion_callback_();
@@ -304,6 +328,7 @@ public:
    */
   bool is_running()
   {
+    // execution_future 在等待结果
     return execution_future_.valid() &&
            (execution_future_.wait_for(std::chrono::milliseconds(0)) ==
            std::future_status::timeout);
@@ -319,6 +344,7 @@ public:
     return server_active_;
   }
 
+  // 是否这个 action server 被要求使用新 goal 来抢占优先级
   /**
    * @brief Whether the action server has been asked to be preempted with a new goal
    * @return bool If there's a preemption request or not
@@ -329,6 +355,7 @@ public:
     return preempt_requested_;
   }
 
+  // 接受 pending goal
   /**
    * @brief Accept pending goals
    * @return Goal Ptr to the  goal that's going to be accepted
@@ -347,10 +374,12 @@ public:
       current_handle_->abort(empty_result());
     }
 
+    // 把 pending 给 current
     current_handle_ = pending_handle_;
     pending_handle_.reset();
     preempt_requested_ = false;
 
+    // pending 上位, preempted
     debug_msg("Preempted goal");
 
     return current_handle_->get_goal();
@@ -387,6 +416,7 @@ public:
       return std::shared_ptr<const typename ActionT::Goal>();
     }
 
+    // 只有 current handle 在工作才能返回
     return current_handle_->get_goal();
   }
 
@@ -418,6 +448,7 @@ public:
     return pending_handle_->get_goal();
   }
 
+  // 是否有 cancel 请求
   /**
    * @brief Whether or not a cancel command has come in
    * @return bool Whether a cancel command has been requested or not
@@ -466,6 +497,7 @@ public:
     terminate(current_handle_, result);
   }
 
+  // 返回成功
   /**
    * @brief Return success of the active action
    * @param result A result object to send to the terminated actions
@@ -483,6 +515,7 @@ public:
     }
   }
 
+  // 发布反馈
   /**
    * @brief Publish feedback to the action server clients
    * @param feedback A feedback object to send to the clients
@@ -510,20 +543,29 @@ protected:
   std::future<void> execution_future_;
   bool stop_execution_{false};
 
+  // NOTE: mutable 关键字是一个类型修饰符, 它用于修改类的数据成员, 允许一个 const 成员函数修改这个数据成员
+  // NOTE: std::recursive_mutex 是一个互斥体类, 通常用于保护多线程环境中的共享数据
+  // 当你有一个 const 成员函数需要锁定一个互斥体时, 你可能需要将互斥体声明为mutable
+  // 这是因为锁定和解锁互斥体会修改它的状态, 但在逻辑上这并不意味着它改变了包含它的对象的状态
+  // std::recursive_mutex 是一种特殊类型的互斥体, 允许同一个线程多次获取同一互斥体的锁
+  // 这与 std::mutex 不同, std::mutex 在同一线程试图多次锁定时会产生死锁
   mutable std::recursive_mutex update_mutex_;
   bool server_active_{false};
   bool preempt_requested_{false};
   std::chrono::milliseconds server_timeout_;
 
+  // 两个 GoalHandle, 一个当前, 一个 pending
   std::shared_ptr<rclcpp_action::ServerGoalHandle<ActionT>> current_handle_;
   std::shared_ptr<rclcpp_action::ServerGoalHandle<ActionT>> pending_handle_;
 
+  // ros action 服务
   typename rclcpp_action::Server<ActionT>::SharedPtr action_server_;
   bool spin_thread_;
   rclcpp::CallbackGroup::SharedPtr callback_group_{nullptr};
   rclcpp::executors::SingleThreadedExecutor::SharedPtr executor_;
   std::unique_ptr<nav2_util::NodeThread> executor_thread_;
 
+  // 生成一个空的结果
   /**
    * @brief Generate an empty result object for an action type
    */
@@ -532,6 +574,7 @@ protected:
     return std::make_shared<typename ActionT::Result>();
   }
 
+  // 检查一个 handle 是否 active
   /**
    * @brief Whether a given goal handle is currently active
    * @param handle Goal handle to check
@@ -543,6 +586,7 @@ protected:
     return handle != nullptr && handle->is_active();
   }
 
+  // terminate 指定 handle
   /**
    * @brief Terminate a particular action with a result
    * @param handle goal handle to terminate
@@ -563,6 +607,7 @@ protected:
         warn_msg("Aborting handle.");
         handle->abort(result);
       }
+      // 最后 reset
       handle.reset();
     }
   }

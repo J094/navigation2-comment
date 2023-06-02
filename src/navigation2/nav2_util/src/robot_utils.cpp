@@ -29,7 +29,10 @@ bool getCurrentPose(
   const std::string robot_frame, const double transform_timeout,
   const rclcpp::Time stamp)
 {
+  // 这里 global_pose 是输出
+  // 先将其定在机器人原点处
   tf2::toMsg(tf2::Transform::getIdentity(), global_pose.pose);
+  // 这里设置 global_pose 转换前在 robot_frame 中
   global_pose.header.frame_id = robot_frame;
   global_pose.header.stamp = stamp;
 
@@ -46,6 +49,9 @@ bool transformPoseInTargetFrame(
   static rclcpp::Logger logger = rclcpp::get_logger("transformPoseInTargetFrame");
 
   try {
+    // 将机器人原点位置转换到地图上的位置
+    // 坐标系从机器人坐标系到地图坐标系上
+    // robot_frame -> global_frame
     transformed_pose = tf_buffer.transform(
       input_pose, target_frame,
       tf2::durationFromSec(transform_timeout));

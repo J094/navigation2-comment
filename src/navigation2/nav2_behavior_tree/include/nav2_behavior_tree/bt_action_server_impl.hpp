@@ -54,6 +54,7 @@ BtActionServer<ActionT>::BtActionServer(
   logger_ = node->get_logger();
   clock_ = node->get_clock();
 
+  // 拿参数
   // Declare this node's parameters
   if (!node->has_parameter("bt_loop_duration")) {
     node->declare_parameter("bt_loop_duration", 10);
@@ -76,10 +77,12 @@ bool BtActionServer<ActionT>::on_configure()
     throw std::runtime_error{"Failed to lock node"};
   }
 
+  // client 节点名称定义
   // Name client node after action name
   std::string client_node_name = action_name_;
   std::replace(client_node_name.begin(), client_node_name.end(), '/', '_');
   // Use suffix '_rclcpp_node' to keep parameter file consistency #1773
+  // NOTE: "--ros-args" 表示 ros 参数, "-r" 表示重映射, "__node:=" 表示重新定义节点名称, "--" 表示参数列表结束
   auto options = rclcpp::NodeOptions().arguments(
     {"--ros-args",
       "-r",
@@ -87,10 +90,11 @@ bool BtActionServer<ActionT>::on_configure()
       std::string(node->get_name()) + "_" + client_node_name + "_rclcpp_node",
       "--"});
 
-  // client_node_ 原来在此, 最后会被放到黑板的 "node" 中
+  // client 节点原来在此, 最后会被放到黑板的 node 中, 后续给各个 action server 发请求的基础
   // Support for handling the topic-based goal pose from rviz
   client_node_ = std::make_shared<rclcpp::Node>("_", options);
 
+  // action 服务
   action_server_ = std::make_shared<ActionServer>(
     node->get_node_base_interface(),
     node->get_node_clock_interface(),
@@ -98,6 +102,7 @@ bool BtActionServer<ActionT>::on_configure()
     node->get_node_waitables_interface(),
     action_name_, std::bind(&BtActionServer<ActionT>::executeCallback, this));
 
+  // BT 和服务的时间阈值
   // Get parameters for BT timeouts
   int timeout;
   node->get_parameter("bt_loop_duration", timeout);
@@ -105,9 +110,11 @@ bool BtActionServer<ActionT>::on_configure()
   node->get_parameter("default_server_timeout", timeout);
   default_server_timeout_ = std::chrono::milliseconds(timeout);
 
+  // 创建 bt_ 为 BT 引擎, 用于实际执行树
   // Create the class that registers our custom nodes and executes the BT
   bt_ = std::make_unique<nav2_behavior_tree::BehaviorTreeEngine>(plugin_lib_names_);
 
+  // 创建黑板
   // Create the blackboard that will be shared by all of the nodes in the tree
   blackboard_ = BT::Blackboard::create();
 
@@ -154,9 +161,11 @@ bool BtActionServer<ActionT>::on_cleanup()
 template<class ActionT>
 bool BtActionServer<ActionT>::loadBehaviorTree(const std::string & bt_xml_filename)
 {
+  // 如果文件为空, 拿默认的文件
   // Empty filename is default for backward compatibility
   auto filename = bt_xml_filename.empty() ? default_bt_xml_filename_ : bt_xml_filename;
 
+  // 如果行为树没有变化, 不需要重新加载
   // Use previous BT if it is the existing one
   if (current_bt_xml_filename_ == filename) {
     RCLCPP_DEBUG(logger_, "BT will not be reloaded as the given xml is already loaded");
@@ -171,20 +180,24 @@ bool BtActionServer<ActionT>::loadBehaviorTree(const std::string & bt_xml_filena
     return false;
   }
 
+  // 把 xml 文件转成 string
   auto xml_string = std::string(
     std::istreambuf_iterator<char>(xml_file),
     std::istreambuf_iterator<char>());
 
   // Create the Behavior Tree from the XML input
   try {
+    // 通过 string 穿换成 BT
     tree_ = bt_->createTreeFromText(xml_string, blackboard_);
   } catch (const std::exception & e) {
     RCLCPP_ERROR(logger_, "Exception when loading BT: %s", e.what());
     return false;
   }
 
+  // 使用 node 和 tree 创建 logger, 发布相关记录
   topic_logger_ = std::make_unique<RosTopicLogger>(client_node_, tree_);
 
+  // 更新当前树 xml 文件
   current_bt_xml_filename_ = filename;
   return true;
 }
@@ -192,11 +205,13 @@ bool BtActionServer<ActionT>::loadBehaviorTree(const std::string & bt_xml_filena
 template<class ActionT>
 void BtActionServer<ActionT>::executeCallback()
 {
+  // 先获取 goal, 失败则 terminate
   if (!on_goal_received_callback_(action_server_->get_current_goal())) {
     action_server_->terminate_current();
     return;
   }
 
+  // 定义 cancelRequested
   auto is_canceling = [&]() {
       if (action_server_ == nullptr) {
         RCLCPP_DEBUG(logger_, "Action server unavailable. Canceling.");
@@ -209,6 +224,7 @@ void BtActionServer<ActionT>::executeCallback()
       return action_server_->is_cancel_requested();
     };
 
+  // 定义 onLoop
   auto on_loop = [&]() {
       if (action_server_->is_preempt_requested() && on_preempt_callback_) {
         on_preempt_callback_(action_server_->get_pending_goal());
@@ -217,13 +233,16 @@ void BtActionServer<ActionT>::executeCallback()
       on_loop_callback_();
     };
 
+  // 这里执行行为树
   // Execute the BT that was previously created in the configure step
   nav2_behavior_tree::BtStatus rc = bt_->run(&tree_, on_loop, is_canceling, bt_loop_duration_);
 
+  //  halt 所有节点
   // Make sure that the Bt is not in a running state from a previous execution
   // note: if all the ControlNodes are implemented correctly, this is not needed.
   bt_->haltAllActions(tree_.rootNode());
 
+  // 检查结果
   // Give server an opportunity to populate the result message or simple give
   // an indication that the action is complete.
   auto result = std::make_shared<typename ActionT::Result>();

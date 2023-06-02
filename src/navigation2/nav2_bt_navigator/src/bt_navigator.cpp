@@ -33,7 +33,8 @@ BtNavigator::BtNavigator(const rclcpp::NodeOptions & options)
 {
   RCLCPP_INFO(get_logger(), "Creating");
 
-  // 准备一些 plugin 名称
+  // 准备一些 plugins
+  // 这些都是在 nav2_behavior_tree 中定义的
   const std::vector<std::string> plugin_libs = {
     "nav2_compute_path_to_pose_action_bt_node",
     "nav2_compute_path_through_poses_action_bt_node",
@@ -83,6 +84,7 @@ BtNavigator::BtNavigator(const rclcpp::NodeOptions & options)
     "nav2_drive_on_heading_cancel_bt_node"
   };
 
+  // 声明一些参数
   declare_parameter("plugin_lib_names", plugin_libs);
   declare_parameter("transform_tolerance", rclcpp::ParameterValue(0.1));
   declare_parameter("global_frame", std::string("map"));
@@ -99,18 +101,22 @@ BtNavigator::on_configure(const rclcpp_lifecycle::State & /*state*/)
 {
   RCLCPP_INFO(get_logger(), "Configuring");
 
+  // 拿到 buffer, 后续可以通过 buffer 获取位姿
   tf_ = std::make_shared<tf2_ros::Buffer>(get_clock());
   auto timer_interface = std::make_shared<tf2_ros::CreateTimerROS>(
     get_node_base_interface(), get_node_timers_interface());
   tf_->setCreateTimerInterface(timer_interface);
   tf_->setUsingDedicatedThread(true);
+  // 设置 buffer 的监听
   tf_listener_ = std::make_shared<tf2_ros::TransformListener>(*tf_, this, false);
 
+  // 拿一些参数
   global_frame_ = get_parameter("global_frame").as_string();
   robot_frame_ = get_parameter("robot_base_frame").as_string();
   transform_tolerance_ = get_parameter("transform_tolerance").as_double();
   odom_topic_ = get_parameter("odom_topic").as_string();
 
+  // 拿到 plugins 的名称
   // Libraries to pull plugins (BT Nodes) from
   auto plugin_lib_names = get_parameter("plugin_lib_names").as_string_array();
 
@@ -118,15 +124,18 @@ BtNavigator::on_configure(const rclcpp_lifecycle::State & /*state*/)
   pose_navigator_ = std::make_unique<nav2_bt_navigator::NavigateToPoseNavigator>();
   poses_navigator_ = std::make_unique<nav2_bt_navigator::NavigateThroughPosesNavigator>();
 
+  // 反馈
   nav2_bt_navigator::FeedbackUtils feedback_utils;
   feedback_utils.tf = tf_;
   feedback_utils.global_frame = global_frame_;
   feedback_utils.robot_frame = robot_frame_;
   feedback_utils.transform_tolerance = transform_tolerance_;
 
+  // smoother 来获取当前速度
   // Odometry smoother object for getting current speed
   odom_smoother_ = std::make_shared<nav2_util::OdomSmoother>(shared_from_this(), 0.3, odom_topic_);
 
+  // 配置两个 navigator
   if (!pose_navigator_->on_configure(
       shared_from_this(), plugin_lib_names, feedback_utils, &plugin_muxer_, odom_smoother_))
   {
@@ -147,10 +156,12 @@ BtNavigator::on_activate(const rclcpp_lifecycle::State & /*state*/)
 {
   RCLCPP_INFO(get_logger(), "Activating");
 
+  // 激活两个 navigator
   if (!poses_navigator_->on_activate() || !pose_navigator_->on_activate()) {
     return nav2_util::CallbackReturn::FAILURE;
   }
 
+  // 创建和 lifecycle manager 的联系
   // create bond connection
   createBond();
 
@@ -162,10 +173,12 @@ BtNavigator::on_deactivate(const rclcpp_lifecycle::State & /*state*/)
 {
   RCLCPP_INFO(get_logger(), "Deactivating");
 
+  // 反激活两个 navigator
   if (!poses_navigator_->on_deactivate() || !pose_navigator_->on_deactivate()) {
     return nav2_util::CallbackReturn::FAILURE;
   }
 
+  // 切断和 lifecycle manager 的联系
   // destroy bond connection
   destroyBond();
 
@@ -177,14 +190,17 @@ BtNavigator::on_cleanup(const rclcpp_lifecycle::State & /*state*/)
 {
   RCLCPP_INFO(get_logger(), "Cleaning up");
 
+  // 重置 tf 相关
   // Reset the listener before the buffer
   tf_listener_.reset();
   tf_.reset();
 
+  // 清除两个 navigator
   if (!poses_navigator_->on_cleanup() || !pose_navigator_->on_cleanup()) {
     return nav2_util::CallbackReturn::FAILURE;
   }
 
+  // 重置指针
   poses_navigator_.reset();
   pose_navigator_.reset();
 
@@ -196,6 +212,7 @@ nav2_util::CallbackReturn
 BtNavigator::on_shutdown(const rclcpp_lifecycle::State & /*state*/)
 {
   RCLCPP_INFO(get_logger(), "Shutting down");
+  // 直接返回成功
   return nav2_util::CallbackReturn::SUCCESS;
 }
 
@@ -203,6 +220,7 @@ BtNavigator::on_shutdown(const rclcpp_lifecycle::State & /*state*/)
 
 #include "rclcpp_components/register_node_macro.hpp"
 
+// 使用 class loader 来注册, 允许这个节点被发现
 // Register the component with class_loader.
 // This acts as a sort of entry point, allowing the component to be discoverable when its library
 // is being loaded into a running process.

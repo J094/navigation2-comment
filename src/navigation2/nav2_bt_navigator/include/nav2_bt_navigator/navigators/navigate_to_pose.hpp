@@ -69,6 +69,7 @@ public:
    */
   void onGoalPoseReceived(const geometry_msgs::msg::PoseStamped::SharedPtr pose);
 
+  // 拿到这个 navigator 的名称
   /**
    * @brief Get action name for this navigator
    * @return string Name of action server
@@ -120,11 +121,15 @@ protected:
    */
   void initializeGoalPose(ActionT::Goal::ConstSharedPtr goal);
 
+  // 开始时间
   rclcpp::Time start_time_;
 
+  // 订阅 goal
   rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr goal_sub_;
+  // 客户, 用来发请求
   rclcpp_action::Client<ActionT>::SharedPtr self_client_;
 
+  // 黑板 id
   std::string goal_blackboard_id_;
   std::string path_blackboard_id_;
 

@@ -43,6 +43,7 @@ struct FeedbackUtils
   std::shared_ptr<tf2_ros::Buffer> tf;
 };
 
+// 互斥锁, BT navigator 中同时只允许一个 plugin 执行
 /**
  * @class NavigatorMuxer
  * @brief A class to control the state of the BT navigator by allowing only a single
@@ -63,11 +64,13 @@ public:
    */
   bool isNavigating()
   {
+    // NOTE: scoped_lock 会在超出作用域自动解锁
     std::scoped_lock l(mutex_);
     // 不为空表示还在导航中
     return !current_navigator_.empty();
   }
 
+  // 中介函数
   /**
    * @brief Start navigating with a given navigator
    * @param string Name of the navigator to start
@@ -181,17 +184,20 @@ public:
       std::bind(&Navigator::onPreempt, this, std::placeholders::_1),
       std::bind(&Navigator::onCompletion, this, std::placeholders::_1, std::placeholders::_2));
 
+    // 配置 action 服务
     bool ok = true;
     if (!bt_action_server_->on_configure()) {
       ok = false;
     }
 
+    // 拿到黑板, 放些东西进去
     BT::Blackboard::Ptr blackboard = bt_action_server_->getBlackboard();
     blackboard->set<std::shared_ptr<tf2_ros::Buffer>>("tf_buffer", feedback_utils.tf);  // NOLINT
     blackboard->set<bool>("initial_pose_received", false);  // NOLINT
     blackboard->set<int>("number_recoveries", 0);  // NOLINT
     blackboard->set<std::shared_ptr<nav2_util::OdomSmoother>>("odom_smoother", odom_smoother);  // NOLINT
 
+    // 配置本身
     return configure(parent_node, odom_smoother) && ok;
   }
 
@@ -201,12 +207,14 @@ public:
    */
   bool on_activate()
   {
+    // 激活 action 服务
     bool ok = true;
 
     if (!bt_action_server_->on_activate()) {
       ok = false;
     }
 
+    // 激活本身
     return activate() && ok;
   }
 
@@ -216,11 +224,13 @@ public:
    */
   bool on_deactivate()
   {
+    // 反激活 action 服务
     bool ok = true;
     if (!bt_action_server_->on_deactivate()) {
       ok = false;
     }
 
+    // 反激活本身
     return deactivate() && ok;
   }
 
@@ -230,6 +240,7 @@ public:
    */
   bool on_cleanup()
   {
+    // 清除 action 服务
     bool ok = true;
     if (!bt_action_server_->on_cleanup()) {
       ok = false;
@@ -237,9 +248,11 @@ public:
 
     bt_action_server_.reset();
 
+    // 清除本身
     return cleanup() && ok;
   }
 
+  // 虚函数, 需要重写
   /**
    * @brief Get the action name of this navigator to expose
    * @return string Name of action to expose
@@ -258,6 +271,7 @@ public:
   }
 
 protected:
+  // 中介函数, 带互斥锁避免异常
   /**
    * @brief An intermediate goal reception function to mux navigators.
    */
@@ -271,8 +285,10 @@ protected:
       return false;
     }
 
+    // 只有没在导航才接收 goal
     bool goal_accepted = goalReceived(goal);
 
+    // 获取到 goal 就开始导航
     if (goal_accepted) {
       plugin_muxer_->startNavigating(getName());
     }
@@ -280,6 +296,7 @@ protected:
     return goal_accepted;
   }
 
+  // 中介函数
   /**
    * @brief An intermediate completion function to mux navigators
    */
@@ -287,10 +304,12 @@ protected:
     typename ActionT::Result::SharedPtr result,
     const nav2_behavior_tree::BtStatus final_bt_status)
   {
+    // 
     plugin_muxer_->stopNavigating(getName());
     goalCompleted(result, final_bt_status);
   }
 
+  // 虚函数, 需要重写
   /**
    * @brief A callback to be called when a new goal is received by the BT action server
    * Can be used to check if goal is valid and put values on
@@ -298,17 +317,20 @@ protected:
    */
   virtual bool goalReceived(typename ActionT::Goal::ConstSharedPtr goal) = 0;
 
+  // 虚函数, 需要重写
   /**
    * @brief A callback that defines execution that happens on one iteration through the BT
    * Can be used to publish action feedback
    */
   virtual void onLoop() = 0;
 
+  // 虚函数, 需要重写
   /**
    * @brief A callback that is called when a preempt is requested
    */
   virtual void onPreempt(typename ActionT::Goal::ConstSharedPtr goal) = 0;
 
+  // 虚函数, 需要重写
   /**
    * @brief A callback that is called when a the action is completed; Can fill in
    * action result message or indicate that this action is done.

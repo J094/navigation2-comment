@@ -31,6 +31,7 @@
 namespace nav2_bt_navigator
 {
 
+// BtNavigator 实际 ros 节点, 使用这个节点来管理和执行 BT
 /**
  * @class nav2_bt_navigator::BtNavigator
  * @brief An action server that uses behavior tree for navigating a robot to its
@@ -95,12 +96,14 @@ protected:
   // Odometry smoother object
   std::shared_ptr<nav2_util::OdomSmoother> odom_smoother_;
 
+  // 反馈的参数
   // Metrics for feedback
   std::string robot_frame_;
   std::string global_frame_;
   double transform_tolerance_;
   std::string odom_topic_;
 
+  // tf 相关
   // Spinning transform that can be used by the BT nodes
   std::shared_ptr<tf2_ros::Buffer> tf_;
   std::shared_ptr<tf2_ros::TransformListener> tf_listener_;

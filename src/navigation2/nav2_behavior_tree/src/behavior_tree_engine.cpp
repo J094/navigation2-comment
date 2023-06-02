@@ -42,21 +42,26 @@ BehaviorTreeEngine::run(
   std::function<bool()> cancelRequested,
   std::chrono::milliseconds loopTimeout)
 {
+  // 设置 loop 的频率
   rclcpp::WallRate loopRate(loopTimeout);
   BT::NodeStatus result = BT::NodeStatus::RUNNING;
 
   // Loop until something happens with ROS or the node completes
   try {
     while (rclcpp::ok() && result == BT::NodeStatus::RUNNING) {
+      // 检查是否 cancel 了, 用户定义
       if (cancelRequested()) {
         tree->rootNode()->halt();
         return BtStatus::CANCELED;
       }
 
+      // tick 树一下
       result = tree->tickRoot();
 
+      // loop 内做些事, 用户定义
       onLoop();
 
+      // 按照固定频率 tick
       loopRate.sleep();
     }
   } catch (const std::exception & ex) {
@@ -66,6 +71,7 @@ BehaviorTreeEngine::run(
     return BtStatus::FAILED;
   }
 
+  // 等到 result 变成成功或其他, 返回工作状态
   return (result == BT::NodeStatus::SUCCESS) ? BtStatus::SUCCEEDED : BtStatus::FAILED;
 }
 
@@ -74,6 +80,7 @@ BehaviorTreeEngine::createTreeFromText(
   const std::string & xml_string,
   BT::Blackboard::Ptr blackboard)
 {
+  // 根据 xml_string 来构建 树, 要给黑板
   return factory_.createTreeFromText(xml_string, blackboard);
 }
 
@@ -82,6 +89,7 @@ BehaviorTreeEngine::createTreeFromFile(
   const std::string & file_path,
   BT::Blackboard::Ptr blackboard)
 {
+  // 通过 xml 文件来构建树, 要给黑板
   return factory_.createTreeFromFile(file_path, blackboard);
 }
 
@@ -89,13 +97,16 @@ BehaviorTreeEngine::createTreeFromFile(
 void
 BehaviorTreeEngine::haltAllActions(BT::TreeNode * root_node)
 {
+  // 如果树不存在
   if (!root_node) {
     return;
   }
 
+  // 从头开始 halt, 传递下去
   // this halt signal should propagate through the entire tree.
   root_node->halt();
 
+  // 这里为了保险, 遍历所有节点 halt
   // but, just in case...
   auto visitor = [](BT::TreeNode * node) {
       if (node->status() == BT::NodeStatus::RUNNING) {

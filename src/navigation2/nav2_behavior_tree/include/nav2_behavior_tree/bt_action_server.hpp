@@ -37,6 +37,7 @@ class BtActionServer
 public:
   using ActionServer = nav2_util::SimpleActionServer<ActionT>;
 
+  // 这里定义一些方程类, 可以作为参数传入
   typedef std::function<bool (typename ActionT::Goal::ConstSharedPtr)> OnGoalReceivedCallback;
   typedef std::function<void ()> OnLoopCallback;
   typedef std::function<void (typename ActionT::Goal::ConstSharedPtr)> OnPreemptCallback;
@@ -192,6 +193,7 @@ protected:
   // Action name
   std::string action_name_;
 
+  // ros action 服务
   // Our action server implements the template action
   std::shared_ptr<ActionServer> action_server_;
 
@@ -201,37 +203,47 @@ protected:
   // The blackboard shared by all of the nodes in the tree
   BT::Blackboard::Ptr blackboard_;
 
+  // 树的结构
   // The XML file that cointains the Behavior Tree to create
   std::string current_bt_xml_filename_;
   std::string default_bt_xml_filename_;
 
+  // 用于执行树的引擎
   // The wrapper class for the BT functionality
   std::unique_ptr<nav2_behavior_tree::BehaviorTreeEngine> bt_;
 
+  // plugins 名字, 也可以说节点名字
   // Libraries to pull plugins (BT Nodes) from
   std::vector<std::string> plugin_lib_names_;
 
+  // ros 节点, 用于客户对服务的请求
   // A regular, non-spinning ROS node that we can use for calls to the action client
   rclcpp::Node::SharedPtr client_node_;
 
+  // 父 ros 节点
   // Parent node
   rclcpp_lifecycle::LifecycleNode::WeakPtr node_;
 
+  // 时钟
   // Clock
   rclcpp::Clock::SharedPtr clock_;
 
   // Logger
   rclcpp::Logger logger_{rclcpp::get_logger("BtActionServer")};
 
+  // 用来发布 BT logs
   // To publish BT logs
   std::unique_ptr<RosTopicLogger> topic_logger_;
 
+  // BT 执行的周期
   // Duration for each iteration of BT execution
   std::chrono::milliseconds bt_loop_duration_;
 
+  // 默认的服务响应时间
   // Default timeout value while waiting for response from a server
   std::chrono::milliseconds default_server_timeout_;
 
+  // 用户提供的回调
   // User-provided callbacks
   OnGoalReceivedCallback on_goal_received_callback_;
   OnLoopCallback on_loop_callback_;
