@@ -39,6 +39,7 @@ class NavigateThroughPosesNavigator
   : public nav2_bt_navigator::Navigator<nav2_msgs::action::NavigateThroughPoses>
 {
 public:
+  // 这里 ActionT 是 NavigateThroughPoses
   using ActionT = nav2_msgs::action::NavigateThroughPoses;
   typedef std::vector<geometry_msgs::msg::PoseStamped> Goals;
 

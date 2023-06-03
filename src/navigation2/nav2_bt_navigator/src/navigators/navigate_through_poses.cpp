@@ -30,12 +30,14 @@ NavigateThroughPosesNavigator::configure(
   start_time_ = rclcpp::Time(0);
   auto node = parent_node.lock();
 
+  // goals 在黑板中的 id
   if (!node->has_parameter("goals_blackboard_id")) {
     node->declare_parameter("goals_blackboard_id", std::string("goals"));
   }
 
   goals_blackboard_id_ = node->get_parameter("goals_blackboard_id").as_string();
 
+  // path 在黑板中的 id
   if (!node->has_parameter("path_blackboard_id")) {
     node->declare_parameter("path_blackboard_id", std::string("path"));
   }
@@ -55,6 +57,7 @@ NavigateThroughPosesNavigator::getDefaultBTFilepath(
   std::string default_bt_xml_filename;
   auto node = parent_node.lock();
 
+  // 从节点参数中获取默认参数
   if (!node->has_parameter("default_nav_through_poses_bt_xml")) {
     std::string pkg_share_dir =
       ament_index_cpp::get_package_share_directory("nav2_bt_navigator");
@@ -74,6 +77,7 @@ NavigateThroughPosesNavigator::goalReceived(ActionT::Goal::ConstSharedPtr goal)
 {
   auto bt_xml_filename = goal->behavior_tree;
 
+  // 加载 BT
   if (!bt_action_server_->loadBehaviorTree(bt_xml_filename)) {
     RCLCPP_ERROR(
       logger_, "Error loading XML file: %s. Navigation canceled.",
@@ -81,6 +85,7 @@ NavigateThroughPosesNavigator::goalReceived(ActionT::Goal::ConstSharedPtr goal)
     return false;
   }
 
+  // 初始化 goal
   initializeGoalPoses(goal);
 
   return true;
@@ -91,6 +96,7 @@ NavigateThroughPosesNavigator::goalCompleted(
   typename ActionT::Result::SharedPtr /*result*/,
   const nav2_behavior_tree::BtStatus /*final_bt_status*/)
 {
+  // 什么都不做
 }
 
 void
@@ -170,6 +176,7 @@ NavigateThroughPosesNavigator::onLoop()
   feedback_msg->navigation_time = clock_->now() - start_time_;
   feedback_msg->number_of_poses_remaining = goal_poses.size();
 
+  // 这儿就是增加了还剩余多少 poses, 一个 loop 发布一次
   bt_action_server_->publishFeedback(feedback_msg);
 }
 
@@ -178,6 +185,7 @@ NavigateThroughPosesNavigator::onPreempt(ActionT::Goal::ConstSharedPtr goal)
 {
   RCLCPP_INFO(logger_, "Received goal preemption request");
 
+  // 拿到 preempt 的请求, 把 pending 的 goal 优先执行
   if (goal->behavior_tree == bt_action_server_->getCurrentBTFilename() ||
     (goal->behavior_tree.empty() &&
     bt_action_server_->getCurrentBTFilename() == bt_action_server_->getDefaultBTFilename()))
@@ -212,6 +220,7 @@ NavigateThroughPosesNavigator::initializeGoalPoses(ActionT::Goal::ConstSharedPtr
   auto blackboard = bt_action_server_->getBlackboard();
   blackboard->set<int>("number_recoveries", 0);  // NOLINT
 
+  // 把 poses 放到黑板中, 供 BT 节点获取
   // Update the goal pose on the blackboard
   blackboard->set<Goals>(goals_blackboard_id_, goal->poses);
 }
