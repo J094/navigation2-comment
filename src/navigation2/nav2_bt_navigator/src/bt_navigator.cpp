@@ -136,6 +136,7 @@ BtNavigator::on_configure(const rclcpp_lifecycle::State & /*state*/)
   odom_smoother_ = std::make_shared<nav2_util::OdomSmoother>(shared_from_this(), 0.3, odom_topic_);
 
   // 配置两个 navigator
+  // shared_from_this() 返回 this 的 shared_ptr, 这里实际会被转换成 weak_ptr 传入 on_configure()
   if (!pose_navigator_->on_configure(
       shared_from_this(), plugin_lib_names, feedback_utils, &plugin_muxer_, odom_smoother_))
   {

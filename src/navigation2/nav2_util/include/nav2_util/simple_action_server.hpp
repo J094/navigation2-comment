@@ -178,6 +178,7 @@ public:
   }
 
   // 处理接受的 goals, 把他们添加到优先级队列中
+  // handle_goal 和 handle_accept 只返回是否接受这个请求, 实际对于请求的处理在这里进行
   /**
    * @brief Handles accepted goals and adds to preempted queue to switch to
    * @param Goal A server goal handle to cancel
@@ -211,6 +212,7 @@ public:
       }
 
       // 把 handle 给 current
+      // 相当于把 ros action server 用于处理 goal 的 handle 保存到 current 中
       current_handle_ = handle;
 
       // 快速返回, 避免阻塞 executor
@@ -224,6 +226,8 @@ public:
     }
   }
 
+  // 这里是对接收到的 goal 的实际执行, 执行是异步的，对于 goal 的继续获取和 handle 都是不影响
+  // 而这里面真正执行的是用户定义的回调, 如 execute_callback_
   /**
    * @brief Computed background work and processes stop requests
    */
@@ -494,6 +498,7 @@ public:
     std::make_shared<typename ActionT::Result>())
   {
     std::lock_guard<std::recursive_mutex> lock(update_mutex_);
+    // 终结当前的 handle
     terminate(current_handle_, result);
   }
 
@@ -586,7 +591,7 @@ protected:
     return handle != nullptr && handle->is_active();
   }
 
-  // terminate 指定 handle
+  // terminate 指定 handle, 每个 handle 代表一个 goal
   /**
    * @brief Terminate a particular action with a result
    * @param handle goal handle to terminate

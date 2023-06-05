@@ -173,6 +173,7 @@ public:
     std::string default_bt_xml_filename = getDefaultBTFilepath(parent_node);
 
     // 创建行为树 action server
+    // 这里传入了四个处理函数, 对应不同情况下的处理
     // Create the Behavior Tree Action Server for this navigator
     bt_action_server_ = std::make_unique<nav2_behavior_tree::BtActionServer<ActionT>>(
       node,

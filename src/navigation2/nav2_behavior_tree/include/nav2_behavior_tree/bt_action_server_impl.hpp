@@ -202,10 +202,13 @@ bool BtActionServer<ActionT>::loadBehaviorTree(const std::string & bt_xml_filena
   return true;
 }
 
+// 用于在 ros action server 里实际执行任务的回调
 template<class ActionT>
 void BtActionServer<ActionT>::executeCallback()
 {
   // 先获取 goal, 失败则 terminate
+  // 实际是从 ros action goal handle 中获取 goal
+  // 这里指定的是 current handle
   if (!on_goal_received_callback_(action_server_->get_current_goal())) {
     action_server_->terminate_current();
     return;
@@ -225,15 +228,19 @@ void BtActionServer<ActionT>::executeCallback()
     };
 
   // 定义 onLoop
+  // 每个循环都检查 is_preempt_requested
   auto on_loop = [&]() {
       if (action_server_->is_preempt_requested() && on_preempt_callback_) {
+        // 这里指定的是 pending handle, 通过它获取 goal
         on_preempt_callback_(action_server_->get_pending_goal());
       }
       topic_logger_->flush();
+      // 正常的每个 loop 都干的事
       on_loop_callback_();
     };
 
   // 这里执行行为树
+  // 这里传入了 on_loop, 意味着是每 tick 一次就干一次
   // Execute the BT that was previously created in the configure step
   nav2_behavior_tree::BtStatus rc = bt_->run(&tree_, on_loop, is_canceling, bt_loop_duration_);
 
