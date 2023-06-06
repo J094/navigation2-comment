@@ -229,6 +229,7 @@ void BtActionServer<ActionT>::executeCallback()
 
   // 定义 onLoop
   // 每个循环都检查 is_preempt_requested
+  // 如果 pending 有东西, 就是 preempt requested 的状态
   auto on_loop = [&]() {
       if (action_server_->is_preempt_requested() && on_preempt_callback_) {
         // 这里指定的是 pending handle, 通过它获取 goal

@@ -201,6 +201,7 @@ public:
       }
       // 把 handle 给 pending
       pending_handle_ = handle;
+      // 由于 pending 里有东西了, 就可以设置 preempt_requested 为 true
       preempt_requested_ = true;
     } else {
       if (is_active(pending_handle_)) {

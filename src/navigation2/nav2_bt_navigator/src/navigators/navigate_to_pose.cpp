@@ -198,6 +198,7 @@ NavigateToPoseNavigator::onLoop()
   bt_action_server_->publishFeedback(feedback_msg);
 }
 
+// 这里是拿到了 pending 里的 goal
 void
 NavigateToPoseNavigator::onPreempt(ActionT::Goal::ConstSharedPtr goal)
 {
@@ -233,11 +234,13 @@ NavigateToPoseNavigator::initializeGoalPose(ActionT::Goal::ConstSharedPtr goal)
     logger_, "Begin navigating from current location to (%.2f, %.2f)",
     goal->pose.pose.position.x, goal->pose.pose.position.y);
 
+  // 这里拿到新的 goal 了, 重置 recovery 计数
   // Reset state for new action feedback
   start_time_ = clock_->now();
   auto blackboard = bt_action_server_->getBlackboard();
   blackboard->set<int>("number_recoveries", 0);  // NOLINT
 
+  // 把新的 goal 放入黑板中, bt action 可以从黑板中获取 goal
   // Update the goal pose on the blackboard
   blackboard->set<geometry_msgs::msg::PoseStamped>(goal_blackboard_id_, goal->pose);
 }

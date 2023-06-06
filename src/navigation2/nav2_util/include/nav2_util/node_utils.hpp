@@ -134,6 +134,8 @@ std::string get_plugin_type_param(
   NodeT node,
   const std::string & plugin_name)
 {
+  // 如果没有就声明
+  // 这里 plugin type 就是参数的类型
   declare_parameter_if_not_declared(node, plugin_name + ".plugin", rclcpp::PARAMETER_STRING);
   std::string plugin_type;
   try {

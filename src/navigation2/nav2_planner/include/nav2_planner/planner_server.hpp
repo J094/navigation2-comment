@@ -42,6 +42,7 @@
 
 namespace nav2_planner
 {
+// 一个 ros 节点, 专门负责 planner 的管理以及路径的规划
 /**
  * @class nav2_planner::PlannerServer
  * @brief An action server implements the behavior tree's ComputePathToPose
@@ -60,6 +61,9 @@ public:
    */
   ~PlannerServer();
 
+  // 规划器由 map 形式保存, 对应名称和规划器
+  // key: planner id
+  // value: planner
   using PlannerMap = std::unordered_map<std::string, nav2_core::GlobalPlanner::Ptr>;
 
   /**
@@ -105,8 +109,10 @@ protected:
    */
   nav2_util::CallbackReturn on_shutdown(const rclcpp_lifecycle::State & state) override;
 
+  // 两个规划路径的 actions
   using ActionToPose = nav2_msgs::action::ComputePathToPose;
   using ActionThroughPoses = nav2_msgs::action::ComputePathThroughPoses;
+  // 两个规划路径的 action servers
   using ActionServerToPose = nav2_util::SimpleActionServer<ActionToPose>;
   using ActionServerThroughPoses = nav2_util::SimpleActionServer<ActionThroughPoses>;
 
@@ -185,6 +191,7 @@ protected:
     const nav_msgs::msg::Path & path,
     const std::string & planner_id);
 
+  // action server 来实现 bt 中规划路径的动作
   // Our action server implements the ComputePathToPose action
   std::unique_ptr<ActionServerToPose> action_server_pose_;
   std::unique_ptr<ActionServerThroughPoses> action_server_poses_;
@@ -223,18 +230,29 @@ protected:
   rcl_interfaces::msg::SetParametersResult
   dynamicParametersCallback(std::vector<rclcpp::Parameter> parameters);
 
+  // 动态参数的 handler
   // Dynamic parameters handler
   rclcpp::node_interfaces::OnSetParametersCallbackHandle::SharedPtr dyn_params_handler_;
   std::mutex dynamic_params_lock_;
 
+  // 规划器相关
   // Planner
+  // 这个就是保存规划器的 map, 名称和实际的规划器对应
   PlannerMap planners_;
+  // TODO: 暂时不懂这里的意思
+  // global planner 的类加载器
   pluginlib::ClassLoader<nav2_core::GlobalPlanner> gp_loader_;
+  // 默认的规划器名称
   std::vector<std::string> default_ids_;
+  // 默认的规划器类型
   std::vector<std::string> default_types_;
+  // 注册的所有规划器的名称
   std::vector<std::string> planner_ids_;
+  // 注册的所有规划器的类型
   std::vector<std::string> planner_types_;
+  // 最大的规划时间 timeout
   double max_planner_duration_;
+  // 所有规划器名字连接起来, 用空格隔开
   std::string planner_ids_concat_;
 
   // Clock
@@ -243,14 +261,17 @@ protected:
   // TF buffer
   std::shared_ptr<tf2_ros::Buffer> tf_;
 
+  // 全局的 costmap 以及 costmap 线程
   // Global Costmap
   std::shared_ptr<nav2_costmap_2d::Costmap2DROS> costmap_ros_;
   std::unique_ptr<nav2_util::NodeThread> costmap_thread_;
   nav2_costmap_2d::Costmap2D * costmap_;
 
+  // 发布 path 的发布者
   // Publishers for the path
   rclcpp_lifecycle::LifecyclePublisher<nav_msgs::msg::Path>::SharedPtr plan_publisher_;
 
+  // 检查路径是否合理的服务
   // Service to deterime if the path is valid
   rclcpp::Service<nav2_msgs::srv::IsPathValid>::SharedPtr is_path_valid_service_;
 };

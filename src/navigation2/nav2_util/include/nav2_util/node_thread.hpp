@@ -21,6 +21,7 @@
 
 namespace nav2_util
 {
+// 后台线程来处理节点和回调
 /**
  * @class nav2_util::NodeThread
  * @brief A background thread to process node/executor callbacks
