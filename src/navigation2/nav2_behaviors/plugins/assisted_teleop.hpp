@@ -26,6 +26,7 @@
 
 namespace nav2_behaviors
 {
+// ros action
 using AssistedTeleopAction = nav2_msgs::action::AssistedTeleop;
 
 /**
@@ -84,15 +85,19 @@ protected:
    */
   void preemptTeleopCallback(const std_msgs::msg::Empty::SharedPtr msg);
 
+  // action 反馈
   AssistedTeleopAction::Feedback::SharedPtr feedback_;
 
+  // 参数
   // parameters
   double projection_time_;
   double simulation_time_step_;
 
+  // 操作的 twist
   geometry_msgs::msg::Twist teleop_twist_;
   bool preempt_teleop_{false};
 
+  // 订阅消息
   // subscribers
   rclcpp::Subscription<geometry_msgs::msg::Twist>::SharedPtr vel_sub_;
   rclcpp::Subscription<std_msgs::msg::Empty>::SharedPtr preempt_teleop_sub_;

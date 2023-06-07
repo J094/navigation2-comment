@@ -50,6 +50,7 @@ void Spin::onConfigure()
     throw std::runtime_error{"Failed to lock node"};
   }
 
+  // 拿参数
   nav2_util::declare_parameter_if_not_declared(
     node,
     "simulate_ahead_time", rclcpp::ParameterValue(2.0));
@@ -73,6 +74,7 @@ void Spin::onConfigure()
 
 Status Spin::onRun(const std::shared_ptr<const SpinAction::Goal> command)
 {
+  // 拿当前位姿
   geometry_msgs::msg::PoseStamped current_pose;
   if (!nav2_util::getCurrentPose(
       current_pose, *tf_, global_frame_, robot_base_frame_,
@@ -82,9 +84,11 @@ Status Spin::onRun(const std::shared_ptr<const SpinAction::Goal> command)
     return Status::FAILED;
   }
 
+  // 那当前 yaw
   prev_yaw_ = tf2::getYaw(current_pose.pose.orientation);
   relative_yaw_ = 0.0;
 
+  // 拿目标 yaw
   cmd_yaw_ = command->target_yaw;
   RCLCPP_INFO(
     logger_, "Turning %0.2f for spin behavior.",
@@ -98,6 +102,7 @@ Status Spin::onRun(const std::shared_ptr<const SpinAction::Goal> command)
 
 Status Spin::onCycleUpdate()
 {
+  // 拿剩余时间
   rclcpp::Duration time_remaining = end_time_ - steady_clock_.now();
   if (time_remaining.seconds() < 0.0 && command_time_allowance_.seconds() > 0.0) {
     stopRobot();
@@ -107,6 +112,7 @@ Status Spin::onCycleUpdate()
     return Status::FAILED;
   }
 
+  // 那当前位姿
   geometry_msgs::msg::PoseStamped current_pose;
   if (!nav2_util::getCurrentPose(
       current_pose, *tf_, global_frame_, robot_base_frame_,
@@ -116,25 +122,31 @@ Status Spin::onCycleUpdate()
     return Status::FAILED;
   }
 
+  // 拿当前 yaw
   const double current_yaw = tf2::getYaw(current_pose.pose.orientation);
 
+  // 计算 yaw 差
   double delta_yaw = current_yaw - prev_yaw_;
   if (abs(delta_yaw) > M_PI) {
     delta_yaw = copysign(2 * M_PI - abs(delta_yaw), prev_yaw_);
   }
 
+  // 已旋转的角度累计
   relative_yaw_ += delta_yaw;
   prev_yaw_ = current_yaw;
 
+  // 发反馈
   feedback_->angular_distance_traveled = static_cast<float>(relative_yaw_);
   action_server_->publish_feedback(feedback_);
 
+  // 拿剩余旋转, 如果转完了结束
   double remaining_yaw = abs(cmd_yaw_) - abs(relative_yaw_);
   if (remaining_yaw < 1e-6) {
     stopRobot();
     return Status::SUCCEEDED;
   }
 
+  // 计算速度
   double vel = sqrt(2 * rotational_acc_lim_ * remaining_yaw);
   vel = std::min(std::max(vel, min_rotational_vel_), max_rotational_vel_);
 
@@ -146,12 +158,14 @@ Status Spin::onCycleUpdate()
   pose2d.y = current_pose.pose.position.y;
   pose2d.theta = tf2::getYaw(current_pose.pose.orientation);
 
+  // 检查是否碰撞
   if (!isCollisionFree(relative_yaw_, cmd_vel.get(), pose2d)) {
     stopRobot();
     RCLCPP_WARN(logger_, "Collision Ahead - Exiting Spin");
     return Status::FAILED;
   }
 
+  // 如果不碰撞就发布速度
   vel_pub_->publish(std::move(cmd_vel));
 
   return Status::RUNNING;

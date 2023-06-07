@@ -638,6 +638,7 @@ void PlannerServer::isPathValid(
 rcl_interfaces::msg::SetParametersResult
 PlannerServer::dynamicParametersCallback(std::vector<rclcpp::Parameter> parameters)
 {
+  // 修改动态参数的时候需要锁住
   std::lock_guard<std::mutex> lock(dynamic_params_lock_);
   rcl_interfaces::msg::SetParametersResult result;
 
@@ -645,6 +646,7 @@ PlannerServer::dynamicParametersCallback(std::vector<rclcpp::Parameter> paramete
     const auto & type = parameter.get_type();
     const auto & name = parameter.get_name();
 
+    // 这里貌似只配置 expected planner frequency
     if (type == ParameterType::PARAMETER_DOUBLE) {
       if (name == "expected_planner_frequency") {
         if (parameter.as_double() > 0) {

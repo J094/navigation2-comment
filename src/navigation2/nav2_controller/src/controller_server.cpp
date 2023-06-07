@@ -47,23 +47,32 @@ ControllerServer::ControllerServer(const rclcpp::NodeOptions & options)
 {
   RCLCPP_INFO(get_logger(), "Creating controller server");
 
+  // 声明控制频率
   declare_parameter("controller_frequency", 20.0);
 
+  // 流程检查
   declare_parameter("progress_checker_plugin", default_progress_checker_id_);
+  // 目标检查
   declare_parameter("goal_checker_plugins", default_goal_checker_ids_);
+  // 控制器
   declare_parameter("controller_plugins", default_ids_);
+  // 阈值
   declare_parameter("min_x_velocity_threshold", rclcpp::ParameterValue(0.0001));
   declare_parameter("min_y_velocity_threshold", rclcpp::ParameterValue(0.0001));
   declare_parameter("min_theta_velocity_threshold", rclcpp::ParameterValue(0.0001));
 
+  // 速度限制消息
   declare_parameter("speed_limit_topic", rclcpp::ParameterValue("speed_limit"));
 
+  // 失败阈值
   declare_parameter("failure_tolerance", rclcpp::ParameterValue(0.0));
 
+  // costmap 的 ros 节点
   // The costmap node is used in the implementation of the controller
   costmap_ros_ = std::make_shared<nav2_costmap_2d::Costmap2DROS>(
     "local_costmap", std::string{get_namespace()}, "local_costmap");
 
+  // 运行 costmap ros 节点的线程
   // Launch a thread to run the costmap node
   costmap_thread_ = std::make_unique<nav2_util::NodeThread>(costmap_ros_);
 }
@@ -122,6 +131,7 @@ ControllerServer::on_configure(const rclcpp_lifecycle::State & /*state*/)
   get_parameter("speed_limit_topic", speed_limit_topic);
   get_parameter("failure_tolerance", failure_tolerance_);
 
+  // 配置 costmap
   costmap_ros_->configure();
 
   try {
@@ -192,9 +202,12 @@ ControllerServer::on_configure(const rclcpp_lifecycle::State & /*state*/)
     get_logger(),
     "Controller Server has %s controllers available.", controller_ids_concat_.c_str());
 
+  // 订阅 odom
   odom_sub_ = std::make_unique<nav_2d_utils::OdomSubscriber>(node);
+  // 发布速度
   vel_publisher_ = create_publisher<geometry_msgs::msg::Twist>("cmd_vel", 1);
 
+  // 创建 ros action server 来实际执行 follow path 的动作
   // Create the action server that we implement with our followPath method
   action_server_ = std::make_unique<ActionServer>(
     shared_from_this(),
@@ -204,6 +217,7 @@ ControllerServer::on_configure(const rclcpp_lifecycle::State & /*state*/)
     std::chrono::milliseconds(500),
     true);
 
+  // 订阅速度限制
   // Set subscribtion to the speed limiting topic
   speed_limit_sub_ = create_subscription<nav2_msgs::msg::SpeedLimit>(
     speed_limit_topic, rclcpp::QoS(10),
@@ -343,11 +357,13 @@ bool ControllerServer::findGoalCheckerId(
 
 void ControllerServer::computeControl()
 {
+  // 控制过程中不允许改变动态参数
   std::lock_guard<std::mutex> lock(dynamic_params_lock_);
 
   RCLCPP_INFO(get_logger(), "Received a goal, begin computing control effort.");
 
   try {
+    // 拿到 controller 的名称, 获取 controller
     std::string c_name = action_server_->get_current_goal()->controller_id;
     std::string current_controller;
     if (findControllerId(c_name, current_controller)) {
@@ -357,6 +373,7 @@ void ControllerServer::computeControl()
       return;
     }
 
+    // 拿到 goal checker 的名称, 获取 goal checker
     std::string gc_name = action_server_->get_current_goal()->goal_checker_id;
     std::string current_goal_checker;
     if (findGoalCheckerId(gc_name, current_goal_checker)) {
@@ -366,12 +383,15 @@ void ControllerServer::computeControl()
       return;
     }
 
+    // 设置规划的路径
     setPlannerPath(action_server_->get_current_goal()->path);
     progress_checker_->reset();
 
+    // 上一个控制时间更新
     last_valid_cmd_time_ = now();
     rclcpp::WallRate loop_rate(controller_frequency_);
     while (rclcpp::ok()) {
+      // 循环处理
       if (action_server_ == nullptr || !action_server_->is_server_active()) {
         RCLCPP_DEBUG(get_logger(), "Action server unavailable or inactive. Stopping.");
         return;
@@ -390,10 +410,13 @@ void ControllerServer::computeControl()
         r.sleep();
       }
 
+      // 更新全局路径
       updateGlobalPath();
 
+      // 计算和发布控制速度
       computeAndPublishVelocity();
 
+      // 检查是否到达终点
       if (isGoalReached()) {
         RCLCPP_INFO(get_logger(), "Reached the goal!");
         break;
@@ -434,8 +457,10 @@ void ControllerServer::setPlannerPath(const nav_msgs::msg::Path & path)
   if (path.poses.empty()) {
     throw nav2_core::PlannerException("Invalid path, Path is empty.");
   }
+  // 给控制器设置 path
   controllers_[current_controller_]->setPlan(path);
 
+  // 终点设置
   end_pose_ = path.poses.back();
   end_pose_.header.frame_id = path.header.frame_id;
   goal_checkers_[current_goal_checker_]->reset();
@@ -444,6 +469,7 @@ void ControllerServer::setPlannerPath(const nav_msgs::msg::Path & path)
     get_logger(), "Path end point is (%.2f, %.2f)",
     end_pose_.pose.position.x, end_pose_.pose.position.y);
 
+  // 当前的路径设置
   current_path_ = path;
 }
 
@@ -451,24 +477,29 @@ void ControllerServer::computeAndPublishVelocity()
 {
   geometry_msgs::msg::PoseStamped pose;
 
+  // 拿到机器人位姿
   if (!getRobotPose(pose)) {
     throw nav2_core::PlannerException("Failed to obtain robot pose");
   }
 
+  // 检查位姿
   if (!progress_checker_->check(pose)) {
     throw nav2_core::PlannerException("Failed to make progress");
   }
 
+  // 拿到过滤过的速度
   nav_2d_msgs::msg::Twist2D twist = getThresholdedTwist(odom_sub_->getTwist());
 
   geometry_msgs::msg::TwistStamped cmd_vel_2d;
 
+  // 然后就是计算速度了
   try {
     cmd_vel_2d =
       controllers_[current_controller_]->computeVelocityCommands(
       pose,
       nav_2d_utils::twist2Dto3D(twist),
       goal_checkers_[current_goal_checker_].get());
+    // 更新速度控制时间
     last_valid_cmd_time_ = now();
   } catch (nav2_core::PlannerException & e) {
     if (failure_tolerance_ > 0 || failure_tolerance_ == -1.0) {
@@ -491,6 +522,7 @@ void ControllerServer::computeAndPublishVelocity()
     }
   }
 
+  // 发布 feedback
   std::shared_ptr<Action::Feedback> feedback = std::make_shared<Action::Feedback>();
   feedback->speed = std::hypot(cmd_vel_2d.twist.linear.x, cmd_vel_2d.twist.linear.y);
 
@@ -516,11 +548,13 @@ void ControllerServer::computeAndPublishVelocity()
   action_server_->publish_feedback(feedback);
 
   RCLCPP_DEBUG(get_logger(), "Publishing velocity at time %.2f", now().seconds());
+  // 一切都完成发布速度
   publishVelocity(cmd_vel_2d);
 }
 
 void ControllerServer::updateGlobalPath()
 {
+  // 检查是否有抢占, 有抢占处理抢占
   if (action_server_->is_preempt_requested()) {
     RCLCPP_INFO(get_logger(), "Passing new path to controller.");
     auto goal = action_server_->accept_pending_goal();
@@ -574,10 +608,12 @@ bool ControllerServer::isGoalReached()
 {
   geometry_msgs::msg::PoseStamped pose;
 
+  // 拿到当前位姿
   if (!getRobotPose(pose)) {
     return false;
   }
 
+  // 拿到当前速度
   nav_2d_msgs::msg::Twist2D twist = getThresholdedTwist(odom_sub_->getTwist());
   geometry_msgs::msg::Twist velocity = nav_2d_utils::twist2Dto3D(twist);
 
@@ -587,6 +623,7 @@ bool ControllerServer::isGoalReached()
     costmap_ros_->getTfBuffer(), costmap_ros_->getGlobalFrameID(),
     end_pose_, transformed_end_pose, tolerance);
 
+  // 用 goal checker 来检查
   return goal_checkers_[current_goal_checker_]->isGoalReached(
     pose.pose, transformed_end_pose.pose,
     velocity);
@@ -604,6 +641,7 @@ bool ControllerServer::getRobotPose(geometry_msgs::msg::PoseStamped & pose)
 
 void ControllerServer::speedLimitCallback(const nav2_msgs::msg::SpeedLimit::SharedPtr msg)
 {
+  // 给所有控制器设置速度限制
   ControllerMap::iterator it;
   for (it = controllers_.begin(); it != controllers_.end(); ++it) {
     it->second->setSpeedLimit(msg->speed_limit, msg->percentage);

@@ -30,6 +30,7 @@ Wait::~Wait() = default;
 
 Status Wait::onRun(const std::shared_ptr<const WaitAction::Goal> command)
 {
+  // 计算要等到的时间点
   wait_end_ = std::chrono::steady_clock::now() +
     rclcpp::Duration(command->time).to_chrono<std::chrono::nanoseconds>();
   return Status::SUCCEEDED;
@@ -41,9 +42,11 @@ Status Wait::onCycleUpdate()
   auto time_left =
     std::chrono::duration_cast<std::chrono::nanoseconds>(wait_end_ - current_point).count();
 
+  // 发布反馈
   feedback_->time_left = rclcpp::Duration(rclcpp::Duration::from_nanoseconds(time_left));
   action_server_->publish_feedback(feedback_);
 
+  // 一直到没有时间剩余, 就返回成功
   if (time_left > 0) {
     return Status::RUNNING;
   } else {

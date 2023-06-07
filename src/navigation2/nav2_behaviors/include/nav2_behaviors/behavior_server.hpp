@@ -77,17 +77,21 @@ protected:
    */
   nav2_util::CallbackReturn on_shutdown(const rclcpp_lifecycle::State & state) override;
 
+  // tf 获取
   std::shared_ptr<tf2_ros::Buffer> tf_;
   std::shared_ptr<tf2_ros::TransformListener> transform_listener_;
 
+  // 行为 plugins
   // Plugins
   pluginlib::ClassLoader<nav2_core::Behavior> plugin_loader_;
+  // 使用 vector 来保存 plugins
   std::vector<pluginlib::UniquePtr<nav2_core::Behavior>> behaviors_;
   std::vector<std::string> default_ids_;
   std::vector<std::string> default_types_;
   std::vector<std::string> behavior_ids_;
   std::vector<std::string> behavior_types_;
 
+  // 订阅相关
   // Utilities
   std::unique_ptr<nav2_costmap_2d::CostmapSubscriber> costmap_sub_;
   std::unique_ptr<nav2_costmap_2d::FootprintSubscriber> footprint_sub_;

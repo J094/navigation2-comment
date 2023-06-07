@@ -87,21 +87,34 @@ Costmap2DROS::Costmap2DROS(
 
   std::vector<std::string> clearable_layers{"obstacle_layer", "voxel_layer", "range_layer"};
 
+  // 总是发送完整的 costmap
   declare_parameter("always_send_full_costmap", rclcpp::ParameterValue(false));
+  // footprint 的边界扩张, 考虑安全间隔
   declare_parameter("footprint_padding", rclcpp::ParameterValue(0.01f));
+  // footprint 轮廓
   declare_parameter("footprint", rclcpp::ParameterValue(std::string("[]")));
+  // 全局 frame
   declare_parameter("global_frame", rclcpp::ParameterValue(std::string("map")));
+  // 地图高
   declare_parameter("height", rclcpp::ParameterValue(5));
+  // 地图宽
   declare_parameter("width", rclcpp::ParameterValue(5));
+  // 致命的代价阈值, 不可通行
   declare_parameter("lethal_cost_threshold", rclcpp::ParameterValue(100));
+  // 地图的 topic
   declare_parameter(
     "map_topic", rclcpp::ParameterValue(
       (parent_namespace_ == "/" ? "/" : parent_namespace_ + "/") + std::string("map")));
+  // 观测源
   declare_parameter("observation_sources", rclcpp::ParameterValue(std::string("")));
+  // 地图原点 x y
   declare_parameter("origin_x", rclcpp::ParameterValue(0.0));
   declare_parameter("origin_y", rclcpp::ParameterValue(0.0));
+  // 地图需要的 plugins
   declare_parameter("plugins", rclcpp::ParameterValue(default_plugins_));
+  // TODO: 过滤啥?
   declare_parameter("filters", rclcpp::ParameterValue(std::vector<std::string>()));
+  // 地图发布频率
   declare_parameter("publish_frequency", rclcpp::ParameterValue(1.0));
   declare_parameter("resolution", rclcpp::ParameterValue(0.1));
   declare_parameter("robot_base_frame", rclcpp::ParameterValue(std::string("base_link")));

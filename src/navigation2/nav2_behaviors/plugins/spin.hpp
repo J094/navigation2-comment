@@ -73,12 +73,18 @@ protected:
 
   SpinAction::Feedback::SharedPtr feedback_;
 
+  // 最大最小旋转速度
   double min_rotational_vel_;
   double max_rotational_vel_;
+  // 旋转加速度限制
   double rotational_acc_lim_;
+  // 要求旋转的角度
   double cmd_yaw_;
+  // 当前角度
   double prev_yaw_;
+  // 相对角度, 已经旋转的角度
   double relative_yaw_;
+  // 模拟预测时间
   double simulate_ahead_time_;
   rclcpp::Duration command_time_allowance_{0, 0};
   rclcpp::Time end_time_;

@@ -26,6 +26,7 @@ Status BackUp::onRun(const std::shared_ptr<const BackUpAction::Goal> command)
     return Status::FAILED;
   }
 
+  // 确保速度和方向都是负的
   // Silently ensure that both the speed and direction are negative.
   command_x_ = -std::fabs(command->target.x);
   command_speed_ = -std::fabs(command->speed);
@@ -33,6 +34,7 @@ Status BackUp::onRun(const std::shared_ptr<const BackUpAction::Goal> command)
 
   end_time_ = steady_clock_.now() + command_time_allowance_;
 
+  // 获取当前位姿
   if (!nav2_util::getCurrentPose(
       initial_pose_, *tf_, global_frame_, robot_base_frame_,
       transform_tolerance_))

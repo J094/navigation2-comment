@@ -28,6 +28,7 @@
 namespace nav2_behaviors
 {
 
+// 根据朝向运行的行为
 /**
  * @class nav2_behaviors::DriveOnHeading
  * @brief An action server Behavior for spinning in
@@ -64,6 +65,7 @@ public:
       return Status::FAILED;
     }
 
+    // 确保速度和方向是相同朝向的
     // Ensure that both the speed and direction have the same sign
     if (!((command->target.x > 0.0) == (command->speed > 0.0)) ) {
       RCLCPP_ERROR(this->logger_, "Speed and command sign did not match");
@@ -111,18 +113,22 @@ public:
       return Status::FAILED;
     }
 
+    // 计算距离差值
     double diff_x = initial_pose_.pose.position.x - current_pose.pose.position.x;
     double diff_y = initial_pose_.pose.position.y - current_pose.pose.position.y;
     double distance = hypot(diff_x, diff_y);
 
+    // 发布反馈再说
     feedback_->distance_traveled = distance;
     this->action_server_->publish_feedback(feedback_);
 
+    // 如果距离大于命令的距离, 表示已经运行这么远了, 不需要继续
     if (distance >= std::fabs(command_x_)) {
       this->stopRobot();
       return Status::SUCCEEDED;
     }
 
+    // 发布指定速度
     auto cmd_vel = std::make_unique<geometry_msgs::msg::Twist>();
     cmd_vel->linear.y = 0.0;
     cmd_vel->angular.z = 0.0;
@@ -133,12 +139,14 @@ public:
     pose2d.y = current_pose.pose.position.y;
     pose2d.theta = tf2::getYaw(current_pose.pose.orientation);
 
+    // 检测碰撞
     if (!isCollisionFree(distance, cmd_vel.get(), pose2d)) {
       this->stopRobot();
       RCLCPP_WARN(this->logger_, "Collision Ahead - Exiting DriveOnHeading");
       return Status::FAILED;
     }
 
+    // 如果没有碰撞就发布
     this->vel_pub_->publish(std::move(cmd_vel));
 
     return Status::RUNNING;
@@ -161,10 +169,12 @@ protected:
     int cycle_count = 0;
     double sim_position_change;
     const double diff_dist = abs(command_x_) - distance;
+    // 最大循环次数, 实在模拟时间内的
     const int max_cycle_count = static_cast<int>(this->cycle_frequency_ * simulate_ahead_time_);
     geometry_msgs::msg::Pose2D init_pose = pose2d;
     bool fetch_data = true;
 
+    // 开始根据模拟循环次数检测是否碰撞
     while (cycle_count < max_cycle_count) {
       sim_position_change = cmd_vel->linear.x * (cycle_count / this->cycle_frequency_);
       pose2d.x = init_pose.x + sim_position_change * cos(init_pose.theta);
@@ -175,6 +185,7 @@ protected:
         break;
       }
 
+      // 通过 collision checker 检测
       if (!this->collision_checker_->isCollisionFree(pose2d, fetch_data)) {
         return false;
       }
@@ -193,16 +204,21 @@ protected:
       throw std::runtime_error{"Failed to lock node"};
     }
 
+    // 模拟时间
     nav2_util::declare_parameter_if_not_declared(
       node,
       "simulate_ahead_time", rclcpp::ParameterValue(2.0));
     node->get_parameter("simulate_ahead_time", simulate_ahead_time_);
   }
 
+  // action 反馈
   typename ActionT::Feedback::SharedPtr feedback_;
 
+  // 初始位姿
   geometry_msgs::msg::PoseStamped initial_pose_;
+  // 朝向
   double command_x_;
+  // 速度
   double command_speed_;
   rclcpp::Duration command_time_allowance_{0, 0};
   rclcpp::Time end_time_;

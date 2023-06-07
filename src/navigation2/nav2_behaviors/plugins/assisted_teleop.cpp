@@ -26,11 +26,13 @@ AssistedTeleop::AssistedTeleop()
 
 void AssistedTeleop::onConfigure()
 {
+  // lock weak_ptr 获得 shared_ptr
   auto node = node_.lock();
   if (!node) {
     throw std::runtime_error{"Failed to lock node"};
   }
 
+  // 设置参数
   // set up parameters
   nav2_util::declare_parameter_if_not_declared(
     node,
@@ -50,12 +52,16 @@ void AssistedTeleop::onConfigure()
   std::string cmd_vel_teleop;
   node->get_parameter("cmd_vel_teleop", cmd_vel_teleop);
 
+  // 速度订阅
+  // 订阅遥控器发过来的速度控制消息
   vel_sub_ = node->create_subscription<geometry_msgs::msg::Twist>(
     cmd_vel_teleop, rclcpp::SystemDefaultsQoS(),
     std::bind(
       &AssistedTeleop::teleopVelocityCallback,
       this, std::placeholders::_1));
 
+  // 抢占遥控订阅
+  // 只有检测到遥控抢占, 才会允许遥控
   preempt_teleop_sub_ = node->create_subscription<std_msgs::msg::Empty>(
     "preempt_teleop", rclcpp::SystemDefaultsQoS(),
     std::bind(
@@ -65,6 +71,7 @@ void AssistedTeleop::onConfigure()
 
 Status AssistedTeleop::onRun(const std::shared_ptr<const AssistedTeleopAction::Goal> command)
 {
+  // 设置结束时间
   preempt_teleop_ = false;
   command_time_allowance_ = command->time_allowance;
   end_time_ = steady_clock_.now() + command_time_allowance_;
@@ -79,11 +86,14 @@ void AssistedTeleop::onActionCompletion()
 
 Status AssistedTeleop::onCycleUpdate()
 {
+  // 先发布反馈
   feedback_->current_teleop_duration = elasped_time_;
   action_server_->publish_feedback(feedback_);
 
+  // 计算剩余时间
   rclcpp::Duration time_remaining = end_time_ - steady_clock_.now();
   if (time_remaining.seconds() < 0.0 && command_time_allowance_.seconds() > 0.0) {
+    // 时间超了, 停止机器人
     stopRobot();
     RCLCPP_WARN_STREAM(
       logger_,
@@ -94,10 +104,12 @@ Status AssistedTeleop::onCycleUpdate()
 
   // user states that teleop was successful
   if (preempt_teleop_) {
+    // 如果 teleop 成功了
     stopRobot();
     return Status::SUCCEEDED;
   }
 
+  // 拿当前位姿
   geometry_msgs::msg::PoseStamped current_pose;
   if (!nav2_util::getCurrentPose(
       current_pose, *tf_, global_frame_, robot_base_frame_,
@@ -114,12 +126,15 @@ Status AssistedTeleop::onCycleUpdate()
   projected_pose.y = current_pose.pose.position.y;
   projected_pose.theta = tf2::getYaw(current_pose.pose.orientation);
 
+  // 拿控制的速度
   geometry_msgs::msg::Twist scaled_twist = teleop_twist_;
+  // 根据当前位姿和控制速度预测下一个位置
   for (double time = simulation_time_step_; time < projection_time_;
     time += simulation_time_step_)
   {
     projected_pose = projectPose(projected_pose, teleop_twist_, simulation_time_step_);
 
+    // 只有估计到速度控制不会引发碰撞才会发布该速度控制指令
     if (!collision_checker_->isCollisionFree(projected_pose)) {
       if (time == simulation_time_step_) {
         RCLCPP_DEBUG_STREAM_THROTTLE(
@@ -157,6 +172,7 @@ geometry_msgs::msg::Pose2D AssistedTeleop::projectPose(
 {
   geometry_msgs::msg::Pose2D projected_pose = pose;
 
+  // 根据控制速度预估经过 projection_time 时间到达的位置
   projected_pose.x += projection_time * (
     twist.linear.x * cos(pose.theta) +
     twist.linear.y * sin(pose.theta));
@@ -172,11 +188,13 @@ geometry_msgs::msg::Pose2D AssistedTeleop::projectPose(
 
 void AssistedTeleop::teleopVelocityCallback(const geometry_msgs::msg::Twist::SharedPtr msg)
 {
+  // 直接获取到 teleop_twist_
   teleop_twist_ = *msg;
 }
 
 void AssistedTeleop::preemptTeleopCallback(const std_msgs::msg::Empty::SharedPtr)
 {
+  // 直接设置 preempt_teleop_
   preempt_teleop_ = true;
 }
 

@@ -42,18 +42,23 @@ SmootherServer::SmootherServer(const rclcpp::NodeOptions & options)
 {
   RCLCPP_INFO(get_logger(), "Creating smoother server");
 
+  // costmap 的 topic
   declare_parameter(
     "costmap_topic", rclcpp::ParameterValue(
       std::string(
         "global_costmap/costmap_raw")));
+  // footprint 表示机器人的几何, 是否碰撞
   declare_parameter(
     "footprint_topic",
     rclcpp::ParameterValue(
       std::string("global_costmap/published_footprint")));
+  // 机器人的 frame 名称, 默认 base_link
   declare_parameter(
     "robot_base_frame",
     rclcpp::ParameterValue(std::string("base_link")));
+  // tf 容忍阈值
   declare_parameter("transform_tolerance", rclcpp::ParameterValue(0.1));
+  // 用到的 smoother plugin 名称
   declare_parameter("smoother_plugins", default_ids_);
 }
 
@@ -67,8 +72,10 @@ SmootherServer::on_configure(const rclcpp_lifecycle::State &)
 {
   RCLCPP_INFO(get_logger(), "Configuring smoother server");
 
+  // 二话不说, 先把自己搞成 shared_ptr 再用
   auto node = shared_from_this();
 
+  // 获取 smoother id
   get_parameter("smoother_plugins", smoother_ids_);
   if (smoother_ids_ == default_ids_) {
     for (size_t i = 0; i < default_ids_.size(); ++i) {
@@ -78,12 +85,14 @@ SmootherServer::on_configure(const rclcpp_lifecycle::State &)
     }
   }
 
+  // tf buffer 用于获取位姿
   tf_ = std::make_shared<tf2_ros::Buffer>(get_clock());
   auto timer_interface = std::make_shared<tf2_ros::CreateTimerROS>(
     get_node_base_interface(), get_node_timers_interface());
   tf_->setCreateTimerInterface(timer_interface);
   transform_listener_ = std::make_shared<tf2_ros::TransformListener>(*tf_);
 
+  // 各种 topic 和订阅
   std::string costmap_topic, footprint_topic, robot_base_frame;
   double transform_tolerance;
   this->get_parameter("costmap_topic", costmap_topic);
@@ -99,13 +108,16 @@ SmootherServer::on_configure(const rclcpp_lifecycle::State &)
     std::make_shared<nav2_costmap_2d::CostmapTopicCollisionChecker>(
     *costmap_sub_, *footprint_sub_, this->get_name());
 
+  // 加载 plugins
   if (!loadSmootherPlugins()) {
     return nav2_util::CallbackReturn::FAILURE;
   }
 
+  // smooth path 发布初始化
   // Initialize pubs & subs
   plan_publisher_ = create_publisher<nav_msgs::msg::Path>("plan_smoothed", 1);
 
+  // 创建 ros action server 等待请求
   // Create the action server that we implement with our smoothPath method
   action_server_ = std::make_unique<ActionServer>(
     shared_from_this(),
@@ -124,18 +136,22 @@ bool SmootherServer::loadSmootherPlugins()
 
   smoother_types_.resize(smoother_ids_.size());
 
+  // 保存 smoother_types_
   for (size_t i = 0; i != smoother_ids_.size(); i++) {
     try {
       smoother_types_[i] =
         nav2_util::get_plugin_type_param(node, smoother_ids_[i]);
+      // 创建 smoother 实例
       nav2_core::Smoother::Ptr smoother =
         lp_loader_.createUniqueInstance(smoother_types_[i]);
       RCLCPP_INFO(
         get_logger(), "Created smoother : %s of type %s",
         smoother_ids_[i].c_str(), smoother_types_[i].c_str());
+      // configure 每一个 smoother plugin
       smoother->configure(
         node, smoother_ids_[i], tf_, costmap_sub_,
         footprint_sub_);
+      // 保存到 map 中
       smoothers_.insert({smoother_ids_[i], smoother});
     } catch (const pluginlib::PluginlibException & ex) {
       RCLCPP_FATAL(
@@ -161,9 +177,11 @@ SmootherServer::on_activate(const rclcpp_lifecycle::State &)
 {
   RCLCPP_INFO(get_logger(), "Activating");
 
+  // 激活发布
   plan_publisher_->on_activate();
   SmootherMap::iterator it;
   for (it = smoothers_.begin(); it != smoothers_.end(); ++it) {
+    // 激活每一个 smoother
     it->second->activate();
   }
   action_server_->activate();
@@ -179,6 +197,7 @@ SmootherServer::on_deactivate(const rclcpp_lifecycle::State &)
 {
   RCLCPP_INFO(get_logger(), "Deactivating");
 
+  // 反激活
   action_server_->deactivate();
   SmootherMap::iterator it;
   for (it = smoothers_.begin(); it != smoothers_.end(); ++it) {
@@ -197,6 +216,7 @@ SmootherServer::on_cleanup(const rclcpp_lifecycle::State &)
 {
   RCLCPP_INFO(get_logger(), "Cleaning up");
 
+  // 重置所有
   // Cleanup the helper classes
   SmootherMap::iterator it;
   for (it = smoothers_.begin(); it != smoothers_.end(); ++it) {
@@ -227,6 +247,8 @@ bool SmootherServer::findSmootherId(
   const std::string & c_name,
   std::string & current_smoother)
 {
+  // 检查是否存在, 如果不存在就设置为第一个默认的 smoother
+  // 如果存在就是 c_name
   if (smoothers_.find(c_name) == smoothers_.end()) {
     if (smoothers_.size() == 1 && c_name.empty()) {
       RCLCPP_WARN_ONCE(
@@ -254,12 +276,14 @@ bool SmootherServer::findSmootherId(
 
 void SmootherServer::smoothPlan()
 {
+  // 记录开始 smoothing 的时间
   auto start_time = steady_clock_.now();
 
   RCLCPP_INFO(get_logger(), "Received a path to smooth.");
 
   auto result = std::make_shared<Action::Result>();
   try {
+    // 获取 smoother_id 选择指定的 smoother
     std::string c_name = action_server_->get_current_goal()->smoother_id;
     std::string current_smoother;
     if (findSmootherId(c_name, current_smoother)) {
@@ -269,11 +293,15 @@ void SmootherServer::smoothPlan()
       return;
     }
 
+    // 执行 smoothing
     // Perform smoothing
+    // 先拿 goal
     auto goal = action_server_->get_current_goal();
     result->path = goal->path;
+    // 调用 smoother 来执行 smoothing
     result->was_completed = smoothers_[current_smoother_]->smooth(
       result->path, goal->max_smoothing_duration);
+    // 计算时间花费
     result->smoothing_duration = steady_clock_.now() - start_time;
 
     if (!result->was_completed) {
@@ -285,8 +313,10 @@ void SmootherServer::smoothPlan()
         rclcpp::Duration(goal->max_smoothing_duration).seconds(),
         rclcpp::Duration(result->smoothing_duration).seconds());
     }
+    // 如果完成了就发布
     plan_publisher_->publish(result->path);
 
+    // 检查结果 path 是否有碰撞
     // Check for collisions
     if (goal->check_for_collisions) {
       geometry_msgs::msg::Pose2D pose2d;
@@ -296,6 +326,7 @@ void SmootherServer::smoothPlan()
         pose2d.y = pose.pose.position.y;
         pose2d.theta = tf2::getYaw(pose.pose.orientation);
 
+        // 如果有一个位姿是碰撞的, smoothing 失败
         if (!collision_checker_->isCollisionFree(pose2d, fetch_data)) {
           RCLCPP_ERROR(
             get_logger(),
@@ -312,6 +343,8 @@ void SmootherServer::smoothPlan()
       get_logger(), "Smoother succeeded (time: %lf), setting result",
       rclcpp::Duration(result->smoothing_duration).seconds());
 
+    // 如果检查通过, 返回成功
+    // 如果出现异常, 中断所有
     action_server_->succeeded_current(result);
   } catch (nav2_core::PlannerException & e) {
     RCLCPP_ERROR(this->get_logger(), e.what());

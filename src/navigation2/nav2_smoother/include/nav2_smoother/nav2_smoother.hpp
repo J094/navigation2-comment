@@ -45,6 +45,9 @@ namespace nav2_smoother
 class SmootherServer : public nav2_util::LifecycleNode
 {
 public:
+  // map 保存 smoother
+  // key: smoother id
+  // value: smoother 实例
   using SmootherMap = std::unordered_map<std::string, nav2_core::Smoother::Ptr>;
 
   /**
@@ -113,6 +116,7 @@ protected:
    */
   nav2_util::CallbackReturn on_shutdown(const rclcpp_lifecycle::State & state) override;
 
+  // action 和 action server
   using Action = nav2_msgs::action::SmoothPath;
   using ActionServer = nav2_util::SimpleActionServer<Action>;
 
@@ -135,16 +139,20 @@ protected:
    */
   bool findSmootherId(const std::string & c_name, std::string & name);
 
+  // ros action server 实际执行 smoother 操作
   // Our action server implements the SmoothPath action
   std::unique_ptr<ActionServer> action_server_;
 
+  // 获取 tf
   // Transforms
   std::shared_ptr<tf2_ros::Buffer> tf_;
   std::shared_ptr<tf2_ros::TransformListener> transform_listener_;
 
+  // smooth path 的发布
   // Publishers and subscribers
   rclcpp_lifecycle::LifecyclePublisher<nav_msgs::msg::Path>::SharedPtr plan_publisher_;
 
+  // smoother plugin 名称和加载
   // Smoother Plugins
   pluginlib::ClassLoader<nav2_core::Smoother> lp_loader_;
   SmootherMap smoothers_;
@@ -154,6 +162,7 @@ protected:
   std::vector<std::string> smoother_types_;
   std::string smoother_ids_concat_, current_smoother_;
 
+  // 辅助的, costmap 订阅, footprint 订阅, 碰撞检查
   // Utilities
   std::shared_ptr<nav2_costmap_2d::CostmapSubscriber> costmap_sub_;
   std::shared_ptr<nav2_costmap_2d::FootprintSubscriber> footprint_sub_;

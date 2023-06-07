@@ -67,6 +67,7 @@
 namespace nav2_costmap_2d
 {
 
+// 2d costmap 的 ros 节点, 提供地图的订阅
 /** @brief A ROS wrapper for a 2D Costmap. Handles subscribing to
  * topics that provide observations about obstacles in either the form
  * of PointCloud or LaserScan messages. */
@@ -305,22 +306,29 @@ public:
 
 protected:
   // Publishers and subscribers
+  // footprint 的发布
   rclcpp_lifecycle::LifecyclePublisher<geometry_msgs::msg::PolygonStamped>::SharedPtr
     footprint_pub_;
+  // costmap 的发布
   std::unique_ptr<Costmap2DPublisher> costmap_publisher_{nullptr};
 
+  // footprint 的订阅
   rclcpp::Subscription<geometry_msgs::msg::Polygon>::SharedPtr footprint_sub_;
+  // 参数的订阅
   rclcpp::Subscription<rcl_interfaces::msg::ParameterEvent>::SharedPtr parameter_sub_;
 
+  // 为 tf timer_interface 和 message fillter 分配的回调组和执行器
   // Dedicated callback group and executor for tf timer_interface and message fillter
   rclcpp::CallbackGroup::SharedPtr callback_group_;
   rclcpp::executors::SingleThreadedExecutor::SharedPtr executor_;
   std::unique_ptr<nav2_util::NodeThread> executor_thread_;
 
+  // tf buffer 获取位姿用
   // Transform listener
   std::shared_ptr<tf2_ros::Buffer> tf_buffer_;
   std::shared_ptr<tf2_ros::TransformListener> tf_listener_;
 
+  // 叠层 costmap
   std::unique_ptr<LayeredCostmap> layered_costmap_{nullptr};
   std::string name_;
   std::string parent_namespace_;
@@ -372,6 +380,7 @@ protected:
 
   std::unique_ptr<ClearCostmapService> clear_costmap_service_;
 
+  // 动态参数更改的 handle
   // Dynamic parameters handler
   OnSetParametersCallbackHandle::SharedPtr dyn_params_handler;
 

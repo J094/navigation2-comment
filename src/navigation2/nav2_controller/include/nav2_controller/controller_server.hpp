@@ -195,6 +195,7 @@ protected:
    */
   nav_2d_msgs::msg::Twist2D getThresholdedTwist(const nav_2d_msgs::msg::Twist2D & twist)
   {
+    // 把速度过滤阈值
     nav_2d_msgs::msg::Twist2D twist_thresh;
     twist_thresh.x = getThresholdedVelocity(twist.x, min_x_velocity_threshold_);
     twist_thresh.y = getThresholdedVelocity(twist.y, min_y_velocity_threshold_);
@@ -209,19 +210,23 @@ protected:
   rcl_interfaces::msg::SetParametersResult
   dynamicParametersCallback(std::vector<rclcpp::Parameter> parameters);
 
+  // 动态参数相关
   // Dynamic parameters handler
   rclcpp::node_interfaces::OnSetParametersCallbackHandle::SharedPtr dyn_params_handler_;
   std::mutex dynamic_params_lock_;
 
+  // costmap 节点
   // The controller needs a costmap node
   std::shared_ptr<nav2_costmap_2d::Costmap2DROS> costmap_ros_;
   std::unique_ptr<nav2_util::NodeThread> costmap_thread_;
 
+  // 订阅 odom 和速度限制, 发布速度
   // Publishers and subscribers
   std::unique_ptr<nav_2d_utils::OdomSubscriber> odom_sub_;
   rclcpp_lifecycle::LifecyclePublisher<geometry_msgs::msg::Twist>::SharedPtr vel_publisher_;
   rclcpp::Subscription<nav2_msgs::msg::SpeedLimit>::SharedPtr speed_limit_sub_;
 
+  // 检查流程的 plugin
   // Progress Checker Plugin
   pluginlib::ClassLoader<nav2_core::ProgressChecker> progress_checker_loader_;
   nav2_core::ProgressChecker::Ptr progress_checker_;
@@ -230,6 +235,7 @@ protected:
   std::string progress_checker_id_;
   std::string progress_checker_type_;
 
+  // 检查终点的 plugin
   // Goal Checker Plugin
   pluginlib::ClassLoader<nav2_core::GoalChecker> goal_checker_loader_;
   GoalCheckerMap goal_checkers_;
@@ -239,6 +245,7 @@ protected:
   std::vector<std::string> goal_checker_types_;
   std::string goal_checker_ids_concat_, current_goal_checker_;
 
+  // 控制器的 plugin
   // Controller Plugins
   pluginlib::ClassLoader<nav2_core::Controller> lp_loader_;
   ControllerMap controllers_;
@@ -248,19 +255,25 @@ protected:
   std::vector<std::string> controller_types_;
   std::string controller_ids_concat_, current_controller_;
 
+  // 控制器频率
   double controller_frequency_;
+  // 最小速度阈值
   double min_x_velocity_threshold_;
   double min_y_velocity_threshold_;
   double min_theta_velocity_threshold_;
 
+  // 失败的阈值
   double failure_tolerance_;
 
+  // 终点位姿
   // Whether we've published the single controller warning yet
   geometry_msgs::msg::PoseStamped end_pose_;
 
+  // 上一次控制器控制的时间
   // Last time the controller generated a valid command
   rclcpp::Time last_valid_cmd_time_;
 
+  // 需要运行的轨迹
   // Current path container
   nav_msgs::msg::Path current_path_;
 

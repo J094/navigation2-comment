@@ -31,6 +31,7 @@ BehaviorServer::BehaviorServer(const rclcpp::NodeOptions & options)
     "nav2_behaviors/DriveOnHeading",
     "nav2_behaviors/Wait"}
 {
+  // 声明参数
   declare_parameter(
     "costmap_topic",
     rclcpp::ParameterValue(std::string("local_costmap/costmap_raw")));
@@ -40,13 +41,16 @@ BehaviorServer::BehaviorServer(const rclcpp::NodeOptions & options)
   declare_parameter("cycle_frequency", rclcpp::ParameterValue(10.0));
   declare_parameter("behavior_plugins", default_ids_);
 
+  // 获取 plugins 名称
   get_parameter("behavior_plugins", behavior_ids_);
   if (behavior_ids_ == default_ids_) {
     for (size_t i = 0; i < default_ids_.size(); ++i) {
+      // 声明 plugin 的 type
       declare_parameter(default_ids_[i] + ".plugin", default_types_[i]);
     }
   }
 
+  // 声明 frame 和 tf 容忍度
   declare_parameter(
     "global_frame",
     rclcpp::ParameterValue(std::string("odom")));
@@ -69,6 +73,7 @@ BehaviorServer::on_configure(const rclcpp_lifecycle::State & /*state*/)
 {
   RCLCPP_INFO(get_logger(), "Configuring");
 
+  // tf buffer 获取位姿
   tf_ = std::make_shared<tf2_ros::Buffer>(get_clock());
   auto timer_interface = std::make_shared<tf2_ros::CreateTimerROS>(
     get_node_base_interface(),
@@ -76,6 +81,7 @@ BehaviorServer::on_configure(const rclcpp_lifecycle::State & /*state*/)
   tf_->setCreateTimerInterface(timer_interface);
   transform_listener_ = std::make_shared<tf2_ros::TransformListener>(*tf_);
 
+  // 订阅和检查碰撞
   std::string costmap_topic, footprint_topic, robot_base_frame;
   double transform_tolerance;
   this->get_parameter("costmap_topic", costmap_topic);
@@ -91,6 +97,7 @@ BehaviorServer::on_configure(const rclcpp_lifecycle::State & /*state*/)
     *costmap_sub_, *footprint_sub_, this->get_name());
 
   behavior_types_.resize(behavior_ids_.size());
+  // 加载 plugins
   if (!loadBehaviorPlugins()) {
     return nav2_util::CallbackReturn::FAILURE;
   }
@@ -105,12 +112,15 @@ BehaviorServer::loadBehaviorPlugins()
   auto node = shared_from_this();
 
   for (size_t i = 0; i != behavior_ids_.size(); i++) {
+    // 获取 type
     behavior_types_[i] = nav2_util::get_plugin_type_param(node, behavior_ids_[i]);
     try {
       RCLCPP_INFO(
         get_logger(), "Creating behavior plugin %s of type %s",
         behavior_ids_[i].c_str(), behavior_types_[i].c_str());
+      // 创建实例
       behaviors_.push_back(plugin_loader_.createUniqueInstance(behavior_types_[i]));
+      // configure 每一个 plugin
       behaviors_.back()->configure(node, behavior_ids_[i], tf_, collision_checker_);
     } catch (const pluginlib::PluginlibException & ex) {
       RCLCPP_FATAL(

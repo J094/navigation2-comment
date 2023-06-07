@@ -55,6 +55,7 @@ template<typename ActionT>
 class TimedBehavior : public nav2_core::Behavior
 {
 public:
+  // action server, 实际获取请求工作的服务
   using ActionServer = nav2_util::SimpleActionServer<ActionT>;
 
   /**
@@ -70,6 +71,7 @@ public:
 
   virtual ~TimedBehavior() = default;
 
+  // 拿到 goal 执行
   // Derived classes can override this method to catch the command and perform some checks
   // before getting into the main loop. The method will only be called
   // once and should return SUCCEEDED otherwise behavior will return FAILED.
@@ -95,17 +97,20 @@ public:
   {
   }
 
+  // 结束的时候可以做些处理
   // an opportunity for a derived class to do something on action completion
   virtual void onActionCompletion()
   {
   }
 
+  // override 的配置服务
   // configure the server on lifecycle setup
   void configure(
     const rclcpp_lifecycle::LifecycleNode::WeakPtr & parent,
     const std::string & name, std::shared_ptr<tf2_ros::Buffer> tf,
     std::shared_ptr<nav2_costmap_2d::CostmapTopicCollisionChecker> collision_checker) override
   {
+    // 在这里把父节点给了 node_
     node_ = parent;
     auto node = node_.lock();
 
@@ -113,22 +118,28 @@ public:
 
     RCLCPP_INFO(logger_, "Configuring %s", name.c_str());
 
+    // 行为名称和 tf buffer
     behavior_name_ = name;
     tf_ = tf;
 
+    // 获取各种参数
     node->get_parameter("cycle_frequency", cycle_frequency_);
     node->get_parameter("global_frame", global_frame_);
     node->get_parameter("robot_base_frame", robot_base_frame_);
     node->get_parameter("transform_tolerance", transform_tolerance_);
 
+    // 创建 ros action server 来实际执行请求
     action_server_ = std::make_shared<ActionServer>(
       node, behavior_name_,
       std::bind(&TimedBehavior::execute, this));
 
+    // 碰撞检测
     collision_checker_ = collision_checker;
 
+    // 速度订阅
     vel_pub_ = node->template create_publisher<geometry_msgs::msg::Twist>("cmd_vel", 1);
 
+    // 自身配置
     onConfigure();
   }
 
@@ -159,14 +170,21 @@ public:
   }
 
 protected:
+  // action server 的节点
   rclcpp_lifecycle::LifecycleNode::WeakPtr node_;
 
+  // 行为名称
   std::string behavior_name_;
+  // 速度发布
   rclcpp_lifecycle::LifecyclePublisher<geometry_msgs::msg::Twist>::SharedPtr vel_pub_;
+  // ros action server
   std::shared_ptr<ActionServer> action_server_;
+  // 碰撞检查
   std::shared_ptr<nav2_costmap_2d::CostmapTopicCollisionChecker> collision_checker_;
+  // tf buffer 获取位姿
   std::shared_ptr<tf2_ros::Buffer> tf_;
 
+  // 循环频率
   double cycle_frequency_;
   double enabled_;
   std::string global_frame_;
@@ -180,12 +198,14 @@ protected:
   // Logger
   rclcpp::Logger logger_{rclcpp::get_logger("nav2_behaviors")};
 
+  // 实际的请求执行是在这里
   // Main execution callbacks for the action server implementation calling the Behavior's
   // onRun and cycle functions to execute a specific behavior
   void execute()
   {
     RCLCPP_INFO(logger_, "Running %s", behavior_name_.c_str());
 
+    // 只有 enabled 才能用, 也就是激活过
     if (!enabled_) {
       RCLCPP_WARN(
         logger_,
@@ -193,6 +213,7 @@ protected:
       return;
     }
 
+    // 执行, 成功才继续
     if (onRun(action_server_->get_current_goal()) != Status::SUCCEEDED) {
       RCLCPP_INFO(
         logger_,
@@ -206,6 +227,7 @@ protected:
     // Initialize the ActionT result
     auto result = std::make_shared<typename ActionT::Result>();
 
+    // 设置循环频率
     rclcpp::WallRate loop_rate(cycle_frequency_);
 
     while (rclcpp::ok()) {
@@ -232,6 +254,7 @@ protected:
         return;
       }
 
+      // 每一次循环都执行一次
       switch (onCycleUpdate()) {
         case Status::SUCCEEDED:
           RCLCPP_INFO(
