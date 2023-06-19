@@ -70,6 +70,8 @@ Costmap2DROS::Costmap2DROS(
     // use this to make sure the node is placed on the provided namespace
     // TODO(orduno) Pass a sub-node instead of creating a new node for better handling
     //              of the namespaces
+    // "__ns:=" remapping 命名空间
+    // "__node:=" remapping 节点名
     rclcpp::NodeOptions().arguments({
     "--ros-args", "-r", std::string("__ns:=") +
     nav2_util::add_namespaces(parent_namespace, local_namespace),
@@ -77,7 +79,9 @@ Costmap2DROS::Costmap2DROS(
   })),
   name_(name),
   parent_namespace_(parent_namespace),
+  // 默认的 plugins 包括三种层, 静态, 障碍物, 膨胀等
   default_plugins_{"static_layer", "obstacle_layer", "inflation_layer"},
+  // 还要给定定义的类名
   default_types_{
     "nav2_costmap_2d::StaticLayer",
     "nav2_costmap_2d::ObstacleLayer",
@@ -85,6 +89,7 @@ Costmap2DROS::Costmap2DROS(
 {
   RCLCPP_INFO(get_logger(), "Creating Costmap");
 
+  // 可以清除的 costmap 层
   std::vector<std::string> clearable_layers{"obstacle_layer", "voxel_layer", "range_layer"};
 
   // 总是发送完整的 costmap
@@ -126,6 +131,7 @@ Costmap2DROS::Costmap2DROS(
   declare_parameter("unknown_cost_value", rclcpp::ParameterValue(static_cast<unsigned char>(0xff)));
   declare_parameter("update_frequency", rclcpp::ParameterValue(5.0));
   declare_parameter("use_maximum", rclcpp::ParameterValue(false));
+  // 直接把这个局部变量给声明成 ros node 参数
   declare_parameter("clearable_layers", rclcpp::ParameterValue(clearable_layers));
 }
 

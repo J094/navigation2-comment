@@ -39,6 +39,7 @@ string sanitize_node_name(const string & potential_node_name)
   return node_name;
 }
 
+// 这里是增加命名空间, 也就是用 "/" 将命名空间串起来
 string add_namespaces(const string & top_ns, const string & sub_ns)
 {
   if (!top_ns.empty() && top_ns.back() == '/') {
