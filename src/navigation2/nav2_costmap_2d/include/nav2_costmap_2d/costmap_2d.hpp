@@ -53,6 +53,7 @@
 namespace nav2_costmap_2d
 {
 
+// 方便保存 map 的点对
 // convenient for storing x/y point pairs
 struct MapLocation
 {
@@ -82,6 +83,7 @@ public:
     unsigned int cells_size_x, unsigned int cells_size_y, double resolution,
     double origin_x, double origin_y, unsigned char default_value = 0);
 
+  // 复制构造
   /**
    * @brief  Copy constructor for a costmap, creates a copy efficiently
    * @param map The costmap to copy
@@ -94,6 +96,7 @@ public:
    */
   explicit Costmap2D(const nav_msgs::msg::OccupancyGrid & map);
 
+  // 重载 "=" 实现复制
   /**
    * @brief  Overloaded assignment operator
    * @param  map The costmap to copy
@@ -101,6 +104,7 @@ public:
    */
   Costmap2D & operator=(const Costmap2D & map);
 
+  // 把当前 costmap 转换成 source map 的一个窗口区域
   /**
    * @brief  Turn this costmap into a copy of a window of a costmap passed in
    * @param  map The costmap to copy
@@ -114,6 +118,7 @@ public:
     double win_size_x,
     double win_size_y);
 
+  // 把 source map 的一个窗口区域复制到当前 map
   /**
    * @brief Copies the (x0,y0)..(xn,yn) window from source costmap into a current costmap
      @param source Source costmap where the window will be copied from
@@ -130,6 +135,7 @@ public:
     unsigned int sx0, unsigned int sy0, unsigned int sxn, unsigned int syn,
     unsigned int dx0, unsigned int dy0);
 
+  // 默认构造函数
   /**
    * @brief  Default constructor
    */
@@ -211,6 +217,8 @@ public:
    */
   inline unsigned int getIndex(unsigned int mx, unsigned int my) const
   {
+    // 需要把 index 转换到数组 index
+    // 2D -> 1D
     return my * size_x_ + mx;
   }
 
@@ -292,6 +300,7 @@ public:
     return default_value_;
   }
 
+  // 给一堆点的 convec polygon 来设置其内区域的 cost
   /**
    * @brief  Sets the cost of a convex polygon to a desired value
    * @param polygon The polygon to perform the operation on
@@ -358,6 +367,7 @@ public:
    */
   unsigned int cellDistance(double world_dist);
 
+  // 递归锁
   // Provide a typedef to ease future code maintenance
   typedef std::recursive_mutex mutex_t;
   mutex_t * getMutex()
@@ -366,6 +376,7 @@ public:
   }
 
 protected:
+  // 复制 source map 的一个 region 到 destination map
   /**
    * @brief  Copy a region of a source map into a destination map
    * @param  source_map The source map
@@ -387,6 +398,7 @@ protected:
     unsigned int dm_lower_left_y, unsigned int dm_size_x, unsigned int region_size_x,
     unsigned int region_size_y)
   {
+    // NOTE: 一行一行地把数据复制到目标地图, 直接操作地址
     // we'll first need to compute the starting points for each map
     data_type * sm_index = source_map + (sm_lower_left_y * sm_size_x + sm_lower_left_x);
     data_type * dm_index = dest_map + (dm_lower_left_y * dm_size_x + dm_lower_left_x);
@@ -515,18 +527,26 @@ private:
     return x > 0 ? 1.0 : -1.0;
   }
 
+  // 锁, 是否可以访问
   mutex_t * access_;
 
 protected:
+  // 尺寸
   unsigned int size_x_;
   unsigned int size_y_;
+  // xx m/cell 一格像素多少米, 一个像素算一个 cost
   double resolution_;
+  // 地图中心, 左下角的点的世界坐标
   double origin_x_;
   double origin_y_;
+  // costmap 以 char 数组形式保存
   unsigned char * costmap_;
+  // 默认的 cost
   unsigned char default_value_;
 
+  // NOTE: 成员类这么定义, 用注释括起来
   // *INDENT-OFF* Uncrustify doesn't handle indented public/private labels
+  // 一个 cell, 每一个 cell 有一个 cost 值
   class MarkCell
   {
   public:
@@ -540,10 +560,13 @@ protected:
     }
 
   private:
+    // costmap
     unsigned char * costmap_;
+    // 本身的 cost
     unsigned char value_;
   };
 
+  // 多边形边框 cell
   class PolygonOutlineCells
   {
   public:

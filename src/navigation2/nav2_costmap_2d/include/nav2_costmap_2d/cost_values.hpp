@@ -39,10 +39,16 @@
 /** Provides a mapping for often used cost values */
 namespace nav2_costmap_2d
 {
+// 这里定义了一系列 cost 值
+// 没有信息
 static constexpr unsigned char NO_INFORMATION = 255;
+// 致命障碍
 static constexpr unsigned char LETHAL_OBSTACLE = 254;
+// 膨胀的障碍
 static constexpr unsigned char INSCRIBED_INFLATED_OBSTACLE = 253;
+// 最大无障碍
 static constexpr unsigned char MAX_NON_OBSTACLE = 252;
+// 自由区域
 static constexpr unsigned char FREE_SPACE = 0;
 }
 #endif  // NAV2_COSTMAP_2D__COST_VALUES_HPP_

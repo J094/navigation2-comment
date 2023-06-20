@@ -38,6 +38,7 @@
 namespace nav2_util
 {
 
+// 这里定义了 OccupancyGrid data 的常数
 /**
   * @brief OccupancyGrid data constants
   */

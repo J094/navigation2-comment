@@ -81,7 +81,7 @@ Costmap2DROS::Costmap2DROS(
   parent_namespace_(parent_namespace),
   // 默认的 plugins 包括三种层, 静态, 障碍物, 膨胀等
   default_plugins_{"static_layer", "obstacle_layer", "inflation_layer"},
-  // 还要给定定义的类名
+  // 还要给定定义的类名, 通过类名来寻找插件
   default_types_{
     "nav2_costmap_2d::StaticLayer",
     "nav2_costmap_2d::ObstacleLayer",
@@ -115,7 +115,7 @@ Costmap2DROS::Costmap2DROS(
   // 地图原点 x y
   declare_parameter("origin_x", rclcpp::ParameterValue(0.0));
   declare_parameter("origin_y", rclcpp::ParameterValue(0.0));
-  // 地图需要的 plugins
+  // 地图层的 plugins
   declare_parameter("plugins", rclcpp::ParameterValue(default_plugins_));
   // TODO: 过滤啥?
   declare_parameter("filters", rclcpp::ParameterValue(std::vector<std::string>()));
@@ -143,11 +143,15 @@ nav2_util::CallbackReturn
 Costmap2DROS::on_configure(const rclcpp_lifecycle::State & /*state*/)
 {
   RCLCPP_INFO(get_logger(), "Configuring");
+  // 参数太多, 专门用一个函数来获取
   getParameters();
 
+  // 创建回调组，这里是单线程回调组
+  // 第二个参数决定了是否具备自动执行回调的能力, false 表示必须手动触发回调
   callback_group_ = create_callback_group(
     rclcpp::CallbackGroupType::MutuallyExclusive, false);
 
+  // 创建 costmap 本身
   // Create the costmap itself
   layered_costmap_ = std::make_unique<LayeredCostmap>(
     global_frame_, rolling_window_, track_unknown_space_);
