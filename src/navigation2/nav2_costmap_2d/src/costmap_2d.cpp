@@ -445,6 +445,7 @@ bool Costmap2D::setConvexPolygonCost(
   const std::vector<geometry_msgs::msg::Point> & polygon,
   unsigned char cost_value)
 {
+  // 假设 polygon 是在 global frame 下给的, 就需要变换到地图坐标系下
   // we assume the polygon is given in the global_frame...
   // we need to transform it to map coordinates
   std::vector<MapLocation> map_polygon;
@@ -459,9 +460,11 @@ bool Costmap2D::setConvexPolygonCost(
 
   std::vector<MapLocation> polygon_cells;
 
+  // 从 map_polygon 获取所有其包含的 cell
   // get the cells that fill the polygon
   convexFillCells(map_polygon, polygon_cells);
 
+  // 然后把每一个 cell 都填上指定 cost
   // set the cost of those cells
   for (unsigned int i = 0; i < polygon_cells.size(); ++i) {
     unsigned int index = getIndex(polygon_cells[i].x, polygon_cells[i].y);
@@ -474,11 +477,14 @@ void Costmap2D::polygonOutlineCells(
   const std::vector<MapLocation> & polygon,
   std::vector<MapLocation> & polygon_cells)
 {
+  // 先创建 polygon outline cells
   PolygonOutlineCells cell_gatherer(*this, costmap_, polygon_cells);
+  // 遍历所有相邻连线
   for (unsigned int i = 0; i < polygon.size() - 1; ++i) {
     raytraceLine(cell_gatherer, polygon[i].x, polygon[i].y, polygon[i + 1].x, polygon[i + 1].y);
   }
   if (!polygon.empty()) {
+    // 如果不为空, 最后还需要取最后的点到初始点的连线段
     unsigned int last_index = polygon.size() - 1;
     // we also need to close the polygon by going from the last point to the first
     raytraceLine(
@@ -491,14 +497,18 @@ void Costmap2D::convexFillCells(
   const std::vector<MapLocation> & polygon,
   std::vector<MapLocation> & polygon_cells)
 {
+  // 至少要三角形
   // we need a minimum polygon of a triangle
   if (polygon.size() < 3) {
     return;
   }
 
+  // 首先拿到边缘线的 cells
   // first get the cells that make up the outline of the polygon
   polygonOutlineCells(polygon, polygon_cells);
 
+  // NOTE: 快速冒泡排序简单实现
+  // 采用快速冒泡排序
   // quick bubble sort to sort points by x
   MapLocation swap;
   unsigned int i = 0;
@@ -519,15 +529,19 @@ void Costmap2D::convexFillCells(
   i = 0;
   MapLocation min_pt;
   MapLocation max_pt;
+  // 最小 x 到最大 x
   unsigned int min_x = polygon_cells[0].x;
   unsigned int max_x = polygon_cells[polygon_cells.size() - 1].x;
 
+  // 遍历所有 x
   // walk through each column and mark cells inside the polygon
   for (unsigned int x = min_x; x <= max_x; ++x) {
     if (i >= polygon_cells.size() - 1) {
       break;
     }
 
+    // TODO: 这里开始取的两个点并没有判断这两个点是否取在 x 的位置?
+    // 先取相邻两个 cell 的点作为连接线
     if (polygon_cells[i].y < polygon_cells[i + 1].y) {
       min_pt = polygon_cells[i];
       max_pt = polygon_cells[i + 1];
@@ -536,6 +550,7 @@ void Costmap2D::convexFillCells(
       max_pt = polygon_cells[i];
     }
 
+    // 取完之后跳过这两个点, 遍历寻找 x 坐标为当前 x 值的 cell
     i += 2;
     while (i < polygon_cells.size() && polygon_cells[i].x == x) {
       if (polygon_cells[i].y < min_pt.y) {
@@ -546,6 +561,7 @@ void Costmap2D::convexFillCells(
       ++i;
     }
 
+    // 获得了 min_y 和 max_y, 我们就可以把他们放入 polygon_cells 中了
     MapLocation pt;
     // loop though cells in the column
     for (unsigned int y = min_pt.y; y <= max_pt.y; ++y) {
@@ -593,12 +609,15 @@ double Costmap2D::getResolution() const
 
 bool Costmap2D::saveMap(std::string file_name)
 {
+  // 打开保存地图名称的 FILE
   FILE * fp = fopen(file_name.c_str(), "w");
 
+  // 如果没打开, false
   if (!fp) {
     return false;
   }
 
+  // 打印到文件 fp 中
   fprintf(fp, "P2\n%u\n%u\n%u\n", size_x_, size_y_, 0xff);
   for (unsigned int iy = 0; iy < size_y_; iy++) {
     for (unsigned int ix = 0; ix < size_x_; ix++) {
@@ -607,6 +626,7 @@ bool Costmap2D::saveMap(std::string file_name)
     }
     fprintf(fp, "\n");
   }
+  // 写完关闭 fp
   fclose(fp);
   return true;
 }

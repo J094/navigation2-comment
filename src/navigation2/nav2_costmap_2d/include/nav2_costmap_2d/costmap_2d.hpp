@@ -230,6 +230,7 @@ public:
    */
   inline void indexToCells(unsigned int index, unsigned int & mx, unsigned int & my) const
   {
+    // 地图上的 x y 坐标
     my = index / size_x_;
     mx = index - (my * size_x_);
   }
@@ -445,39 +446,51 @@ protected:
     unsigned int y1,
     unsigned int max_length = UINT_MAX, unsigned int min_length = 0)
   {
+    // at 表示在什么上面
     int dx_full = x1 - x0;
     int dy_full = y1 - y0;
 
+    // hypot 计算线段的长度
     // we need to chose how much to scale our dominant dimension,
     // based on the maximum length of the line
     double dist = std::hypot(dx_full, dy_full);
+    // 设置了最小长度就忽略不计
     if (dist < min_length) {
       return;
     }
 
     unsigned int min_x0, min_y0;
     if (dist > 0.0) {
+      // 根据最小长度来调整开始计算的点, 这里就是把 min_length 分解到 x 和 y 轴上
       // Adjust starting point and offset to start from min_length distance
       min_x0 = (unsigned int)(x0 + dx_full / dist * min_length);
       min_y0 = (unsigned int)(y0 + dy_full / dist * min_length);
     } else {
+      // 如果 dist 为 0, 那么开始点和结束点一样
       // dist can be 0 if [x0, y0]==[x1, y1].
       // In this case only this cell should be processed.
       min_x0 = x0;
       min_y0 = y0;
     }
+    // 计算得到 offset 为线段开始的点
     unsigned int offset = min_y0 * size_x_ + min_x0;
 
+    // 这里重新计算 dx 和 dy
     int dx = x1 - min_x0;
     int dy = y1 - min_y0;
 
     unsigned int abs_dx = abs(dx);
     unsigned int abs_dy = abs(dy);
 
+    // 表示 x 轴上偏移
     int offset_dx = sign(dx);
+    // 表示 y 轴上偏移, y 轴上偏移一位实际就是偏移 size_x 位
     int offset_dy = sign(dy) * size_x_;
 
+    // 缩放率, 距离为 0 就是 1, 否则就是 max_length / dist, 不会大于 1
+    // 这个缩放率决定了 abs_dx 和 abs_dy 取多长
     double scale = (dist == 0.0) ? 1.0 : std::min(1.0, max_length / dist);
+    // 如果 x 是主要长度, 那么 x 轴上每个值的 cell 数量都是 1
     // if x is dominant
     if (abs_dx >= abs_dy) {
       int error_y = abs_dx / 2;
@@ -487,6 +500,7 @@ protected:
       return;
     }
 
+    // 其他情况 y 是主要长度, 最终获得边界上的 cells
     // otherwise y is dominant
     int error_x = abs_dy / 2;
 
@@ -495,6 +509,7 @@ protected:
   }
 
 private:
+  // NOTE: Bresenham's raytracing algorithm 实现
   /**
    * @brief  A 2D implementation of Bresenham's raytracing algorithm...
    * applies an action at each step
@@ -506,16 +521,27 @@ private:
     int offset_b, unsigned int offset,
     unsigned int max_length)
   {
+    // 取结束点
     unsigned int end = std::min(max_length, abs_da);
+    // 开始遍历 a 轴线段上的点
+    // 这里通过 abs_da 和 abs_db 的比例来控制加点
+    // 正常增加 a 轴坐标, 同时会增加 b 轴上量化点和实际点的误差, 误差的累加量可以通过 abs_db 近似
+    // 累加误差超过 abs_da 时, 意味着误差过大，可以增加 b 轴坐标的同时也会降低误差, 降低量可以通过 abs_da 近似
     for (unsigned int i = 0; i < end; ++i) {
+      // 每次去 offset 处的 a b 坐标
       at(offset);
+      // 对于 a 就需要增加 a 的 offset
       offset += offset_a;
+      // 累计 b 的 error
       error_b += abs_db;
       if ((unsigned int)error_b >= abs_da) {
+        // 如果 b 的 error 大于等于 a 轴上的距离, b 轴走一位
         offset += offset_b;
+        // b 轴走一位, 则降低 b 的 error
         error_b -= abs_da;
       }
     }
+    // 添加最后一个点
     at(offset);
   }
 
@@ -570,6 +596,7 @@ protected:
   class PolygonOutlineCells
   {
   public:
+    // 实际上 char map 没有用到
     PolygonOutlineCells(
       const Costmap2D & costmap, const unsigned char * /*char_map*/,
       std::vector<MapLocation> & cells)
@@ -577,6 +604,7 @@ protected:
     {
     }
 
+    // 获取 costmap 中的 offset 后, 地图上的 x y 坐标
     // just push the relevant cells back onto the list
     inline void operator()(unsigned int offset)
     {
@@ -586,6 +614,7 @@ protected:
     }
 
   private:
+    // 有 costmap 和 cells
     const Costmap2D & costmap_;
     std::vector<MapLocation> & cells_;
   };
