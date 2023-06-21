@@ -52,6 +52,7 @@
 namespace nav2_costmap_2d
 {
 
+// 拿到 SLAM 建的地图, 向里面添加 cost
 /**
  * @class StaticLayer
  * @brief Takes in a map generated from SLAM to add costs to costmap
@@ -92,6 +93,7 @@ public:
    */
   virtual bool isClearable() {return false;}
 
+  // 根据 layer 的更新, 更新 costmap 的边界
   /**
    * @brief Update the bounds of the master costmap by this layer's update dimensions
    * @param robot_x X pose of robot
@@ -106,6 +108,7 @@ public:
     double robot_x, double robot_y, double robot_yaw, double * min_x,
     double * min_y, double * max_x, double * max_y);
 
+  // 在指定窗口内更新 costmap 的 cost
   /**
    * @brief Update the costs in the master costmap in the window
    * @param master_grid The master costmap grid to update
@@ -118,6 +121,7 @@ public:
     nav2_costmap_2d::Costmap2D & master_grid,
     int min_i, int min_j, int max_i, int max_j);
 
+  // match costmap 的尺寸到 layer 中
   /**
    * @brief Match the size of the master costmap
    */
@@ -165,6 +169,7 @@ private:
 
   bool has_updated_data_{false};
 
+  // 地图的原点和宽高
   unsigned int x_{0};
   unsigned int y_{0};
   unsigned int width_{0};

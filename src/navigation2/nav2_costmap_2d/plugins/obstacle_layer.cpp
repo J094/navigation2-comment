@@ -107,6 +107,7 @@ void ObstacleLayer::onInitialize()
     logger_,
     "Subscribed to Topics: %s", topics_string.c_str());
 
+  // 是否是 rolling
   rolling_window_ = layered_costmap_->isRolling();
 
   if (track_unknown_space) {
@@ -115,6 +116,7 @@ void ObstacleLayer::onInitialize()
     default_value_ = FREE_SPACE;
   }
 
+  // match layered_map 的尺寸
   ObstacleLayer::matchSize();
   current_ = true;
   was_reset_ = false;
@@ -124,11 +126,13 @@ void ObstacleLayer::onInitialize()
   auto sub_opt = rclcpp::SubscriptionOptions();
   sub_opt.callback_group = callback_group_;
 
+  // topics 拆分成每一个 topic
   // now we need to split the topics based on whitespace which we can use a stringstream for
   std::stringstream ss(topics_string);
 
   std::string source;
   while (ss >> source) {
+    // 每一次都拿一个 topic 给 source
     // get the parameters for the specific topic
     double observation_keep_time, expected_update_rate, min_obstacle_height, max_obstacle_height;
     std::string topic, sensor_frame, data_type;
@@ -189,6 +193,7 @@ void ObstacleLayer::onInitialize()
       source.c_str(), topic.c_str(),
       sensor_frame.c_str());
 
+    // 创建观测的 buffer
     // create an observation buffer
     observation_buffers_.push_back(
       std::shared_ptr<ObservationBuffer
@@ -201,11 +206,17 @@ void ObstacleLayer::onInitialize()
           global_frame_,
           sensor_frame, tf2::durationFromSec(transform_tolerance))));
 
+    // TODO: 什么是 marking observation buffer?
+    // 用于标记障碍物的缓冲区, 机器人通过传感器探测到障碍物时, 这些观测数据会被添加到这里
+    // 标记障碍物的位置和属性, 以便进行路径规划和避障
     // check if we'll add this buffer to our marking observation buffers
     if (marking) {
       marking_buffers_.push_back(observation_buffers_.back());
     }
 
+    // TODO: 什么是 clearing observation buffer?
+    // 用于清除障碍物的缓冲区, 机器人检测到环境中没有障碍物时, 这些观测数据会被添加到这里
+    // 这些观测数据通常用于清除先前标记的障碍物, 及时更新反应环境的变化
     // check if we'll also add this buffer to our clearing observation buffers
     if (clearing) {
       clearing_buffers_.push_back(observation_buffers_.back());
@@ -223,10 +234,15 @@ void ObstacleLayer::onInitialize()
 
     // create a callback for the topic
     if (data_type == "LaserScan") {
+      // 创建订阅, 订阅传感器消息
       auto sub = std::make_shared<message_filters::Subscriber<sensor_msgs::msg::LaserScan,
           rclcpp_lifecycle::LifecycleNode>>(node, topic, custom_qos_profile, sub_opt);
+      // 取消订阅, 暂时停止接收消息
       sub->unsubscribe();
 
+      // 定义 message filter
+      // 这里是通过 tf 坐标转换来过滤消息
+      // 队列大小为 50
       auto filter = std::make_shared<tf2_ros::MessageFilter<sensor_msgs::msg::LaserScan>>(
         *sub, *tf_, global_frame_, 50,
         node->get_node_logging_interface(),
@@ -234,18 +250,21 @@ void ObstacleLayer::onInitialize()
         tf2::durationFromSec(transform_tolerance));
 
       if (inf_is_valid) {
+        // 如果 inf 是可用的
         filter->registerCallback(
           std::bind(
             &ObstacleLayer::laserScanValidInfCallback, this, std::placeholders::_1,
             observation_buffers_.back()));
 
       } else {
+        // 只有非 inf 值
         filter->registerCallback(
           std::bind(
             &ObstacleLayer::laserScanCallback, this, std::placeholders::_1,
             observation_buffers_.back()));
       }
 
+      // 专门保存观测的订阅
       observation_subscribers_.push_back(sub);
 
       observation_notifiers_.push_back(filter);
@@ -359,16 +378,26 @@ ObstacleLayer::laserScanValidInfCallback(
   sensor_msgs::msg::LaserScan::ConstSharedPtr raw_message,
   const std::shared_ptr<nav2_costmap_2d::ObservationBuffer> & buffer)
 {
+  // 把 inf 转换成最远处的距离
   // Filter positive infinities ("Inf"s) to max_range.
+  // 0.1 毫米
   float epsilon = 0.0001;  // a tenth of a millimeter
+  // 将测量数据拿出来给 message
   sensor_msgs::msg::LaserScan message = *raw_message;
   for (size_t i = 0; i < message.ranges.size(); i++) {
+    // 获取消息的距离
     float range = message.ranges[i];
     if (!std::isfinite(range) && range > 0) {
+      // 只处理无穷的和距离大于 0 的
+      // 并且还要减去 epsilon
+      // 无穷的距离都变成最大测量距离
+      // TODO: 为啥减去 epsilon
+      // 对距离值进行微调和修正, 在后续处理中更准确地处理该距离值
       message.ranges[i] = message.range_max - epsilon;
     }
   }
 
+  // 将激光扫描投影成点云
   // project the laser into a point cloud
   sensor_msgs::msg::PointCloud2 cloud;
   cloud.header = message.header;

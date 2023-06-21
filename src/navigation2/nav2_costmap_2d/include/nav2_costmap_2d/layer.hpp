@@ -51,6 +51,7 @@ namespace nav2_costmap_2d
 {
 class LayeredCostmap;
 
+// 抽象类, 具体是 plugin 的实现
 /**
  * @class Layer
  * @brief Abstract class for layered costmap plugin implementations
@@ -162,6 +163,7 @@ public:
   std::string getFullName(const std::string & param_name);
 
 protected:
+  // Layer 里带上了 layered costmap
   LayeredCostmap * layered_costmap_;
   std::string name_;
   tf2_ros::Buffer * tf_;

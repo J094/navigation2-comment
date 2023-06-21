@@ -50,6 +50,7 @@ namespace nav2_costmap_2d
 {
 class Layer;
 
+// 实例化不同的地图层, 组合起来成为 costmap
 /**
  * @class LayeredCostmap
  * @brief Instantiates different layer plugins and aggregates them into one score
@@ -67,6 +68,7 @@ public:
    */
   ~LayeredCostmap();
 
+  // 在地图更新 loop 外想要更新地图, 就调用这个函数
   /**
    * @brief  Update the underlying costmap with new data.
    * If you want to update the map outside of the update loop that runs, you can call this.
@@ -211,6 +213,9 @@ public:
   bool isOutofBounds(double robot_x, double robot_y);
 
 private:
+  // primary_costmap 是最底层的 costmap
+  // combined_costmap 是最终融合其他 layer 的 costmap
+  // 他们有相同的 size, origin 和 default value
   // primary_costmap_ is a bottom costmap used by plugins when costmap filters were enabled.
   // combined_costmap_ is a final costmap where all results produced by plugins and filters (if any)
   // to be merged.
@@ -219,12 +224,14 @@ private:
   Costmap2D primary_costmap_, combined_costmap_;
   std::string global_frame_;
 
+  // 决定 costmap 是否有一个 rolling window 跟着机器人
   bool rolling_window_;  /// < @brief Whether or not the costmap should roll with the robot
 
   bool current_;
   double minx_, miny_, maxx_, maxy_;
   unsigned int bx0_, bxn_, by0_, byn_;
 
+  // plugins 和 filters
   std::vector<std::shared_ptr<Layer>> plugins_;
   std::vector<std::shared_ptr<Layer>> filters_;
 

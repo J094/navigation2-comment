@@ -56,6 +56,7 @@
 
 namespace nav2_costmap_2d
 {
+// 一个自定义的发布, 周期发布 costmap 的可视化
 /**
  * @class Costmap2DPublisher
  * @brief A tool to periodically publish visualization data from a Costmap2D

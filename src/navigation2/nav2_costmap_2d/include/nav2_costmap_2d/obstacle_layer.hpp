@@ -61,6 +61,7 @@
 namespace nav2_costmap_2d
 {
 
+// 获取点云数据, 填充进 costmap 中
 /**
  * @class ObstacleLayer
  * @brief Takes in laser and pointcloud data to populate into 2D costmap

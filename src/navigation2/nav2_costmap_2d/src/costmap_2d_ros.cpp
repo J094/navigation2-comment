@@ -156,12 +156,14 @@ Costmap2DROS::on_configure(const rclcpp_lifecycle::State & /*state*/)
   layered_costmap_ = std::make_unique<LayeredCostmap>(
     global_frame_, rolling_window_, track_unknown_space_);
 
+  // size 是否被锁定了, 被锁定的不能 resize
   if (!layered_costmap_->isSizeLocked()) {
     layered_costmap_->resizeMap(
       (unsigned int)(map_width_meters_ / resolution_),
       (unsigned int)(map_height_meters_ / resolution_), resolution_, origin_x_, origin_y_);
   }
 
+  // tf 相关, 获取位姿
   // Create the transform-related objects
   tf_buffer_ = std::make_shared<tf2_ros::Buffer>(get_clock());
   auto timer_interface = std::make_shared<tf2_ros::CreateTimerROS>(
@@ -171,6 +173,7 @@ Costmap2DROS::on_configure(const rclcpp_lifecycle::State & /*state*/)
   tf_buffer_->setCreateTimerInterface(timer_interface);
   tf_listener_ = std::make_shared<tf2_ros::TransformListener>(*tf_buffer_);
 
+  // 根据 plugin 名字来创建 plugin 实例, 放入 layered_costmap 中
   // Then load and add the plug-ins to the costmap
   for (unsigned int i = 0; i < plugin_names_.size(); ++i) {
     RCLCPP_INFO(get_logger(), "Using plugin \"%s\"", plugin_names_[i].c_str());
@@ -178,6 +181,7 @@ Costmap2DROS::on_configure(const rclcpp_lifecycle::State & /*state*/)
     std::shared_ptr<Layer> plugin = plugin_loader_.createSharedInstance(plugin_types_[i]);
     layered_costmap_->addPlugin(plugin);
 
+    // 初始化 plugin
     // TODO(mjeronimo): instead of get(), use a shared ptr
     plugin->initialize(
       layered_costmap_.get(), plugin_names_[i], tf_buffer_.get(),
@@ -185,6 +189,7 @@ Costmap2DROS::on_configure(const rclcpp_lifecycle::State & /*state*/)
 
     RCLCPP_INFO(get_logger(), "Initialized plugin \"%s\"", plugin_names_[i].c_str());
   }
+  // 对 filters 做相同的事
   // and costmap filters as well
   for (unsigned int i = 0; i < filter_names_.size(); ++i) {
     RCLCPP_INFO(get_logger(), "Using costmap filter \"%s\"", filter_names_[i].c_str());
@@ -199,20 +204,25 @@ Costmap2DROS::on_configure(const rclcpp_lifecycle::State & /*state*/)
     RCLCPP_INFO(get_logger(), "Initialized costmap filter \"%s\"", filter_names_[i].c_str());
   }
 
+  // 创建 footprint 的订阅
   // Create the publishers and subscribers
   footprint_sub_ = create_subscription<geometry_msgs::msg::Polygon>(
     "footprint",
     rclcpp::SystemDefaultsQoS(),
     std::bind(&Costmap2DROS::setRobotFootprintPolygon, this, std::placeholders::_1));
 
+  // 创建 footprint 的发布
   footprint_pub_ = create_publisher<geometry_msgs::msg::PolygonStamped>(
     "published_footprint", rclcpp::SystemDefaultsQoS());
 
+  // 创建 costmap 的发布, 注意这里是自定义的发布
   costmap_publisher_ = std::make_unique<Costmap2DPublisher>(
     shared_from_this(),
     layered_costmap_->getCostmap(), global_frame_,
     "costmap", always_send_full_costmap_);
 
+  // 设置 footprint, 可以通过半径设置也可以通过配置文件的点设置
+  // footprint_ 是从配置文件获取的 string
   // Set the footprint
   if (use_radius_) {
     setRobotFootprint(makeFootprintFromRadius(robot_radius_));
@@ -222,9 +232,11 @@ Costmap2DROS::on_configure(const rclcpp_lifecycle::State & /*state*/)
     setRobotFootprint(new_footprint);
   }
 
+  // 创建 clean 的服务, 这也是自定义的
   // Add cleaning service
   clear_costmap_service_ = std::make_unique<ClearCostmapService>(shared_from_this(), *this);
 
+  // 创建回调的执行线程
   executor_ = std::make_shared<rclcpp::executors::SingleThreadedExecutor>();
   executor_->add_callback_group(callback_group_, get_node_base_interface());
   executor_thread_ = std::make_unique<nav2_util::NodeThread>(executor_);
@@ -236,6 +248,7 @@ Costmap2DROS::on_activate(const rclcpp_lifecycle::State & /*state*/)
 {
   RCLCPP_INFO(get_logger(), "Activating");
 
+  // activate 发布
   costmap_publisher_->on_activate();
   footprint_pub_->on_activate();
 
@@ -246,6 +259,7 @@ Costmap2DROS::on_activate(const rclcpp_lifecycle::State & /*state*/)
 
   RCLCPP_INFO(get_logger(), "Checking transform");
   rclcpp::Rate r(2);
+  // 检查是否可以获取 tf
   while (rclcpp::ok() &&
     !tf_buffer_->canTransform(
       global_frame_, robot_base_frame_, tf2::TimePointZero, &tf_error))
@@ -261,6 +275,7 @@ Costmap2DROS::on_activate(const rclcpp_lifecycle::State & /*state*/)
     r.sleep();
   }
 
+  // 创建一个线程周期发布地图
   // Create a thread to handle updating the map
   stopped_ = true;  // to active plugins
   stop_updates_ = false;
@@ -268,6 +283,7 @@ Costmap2DROS::on_activate(const rclcpp_lifecycle::State & /*state*/)
   map_update_thread_ = std::make_unique<std::thread>(
     std::bind(&Costmap2DROS::mapUpdateLoop, this, map_update_frequency_));
 
+  // 开始接收传感器消息更新地图
   start();
 
   // Add callback for dynamic parameters
@@ -404,6 +420,7 @@ void
 Costmap2DROS::setRobotFootprintPolygon(
   const geometry_msgs::msg::Polygon::SharedPtr footprint)
 {
+  // 拿到 polygon 来设置 footprint
   setRobotFootprint(toPointVector(footprint));
 }
 
@@ -436,12 +453,14 @@ Costmap2DROS::mapUpdateLoop(double frequency)
   rclcpp::WallRate r(frequency);    // 200ms by default
 
   while (rclcpp::ok() && !map_update_thread_shutdown_) {
+    // 专门定义了测量执行时间的工具
     nav2_util::ExecutionTimer timer;
 
     // Execute after start() will complete plugins activation
     if (!stopped_) {
       // Measure the execution time of the updateMap method
       timer.start();
+      // 终于在这里更新地图了
       updateMap();
       timer.end();
 
@@ -486,6 +505,7 @@ Costmap2DROS::updateMap()
     // get global pose
     geometry_msgs::msg::PoseStamped pose;
     if (getRobotPose(pose)) {
+      // 当前机器人位姿获取 x y yaw
       const double & x = pose.pose.position.x;
       const double & y = pose.pose.position.y;
       const double yaw = tf2::getYaw(pose.pose.orientation);
@@ -493,6 +513,7 @@ Costmap2DROS::updateMap()
 
       auto footprint = std::make_unique<geometry_msgs::msg::PolygonStamped>();
       footprint->header = pose.header;
+      // 要把 footprint 变换到当前位姿下
       transformFootprint(x, y, yaw, padded_footprint_, *footprint);
 
       RCLCPP_DEBUG(get_logger(), "Publishing footprint");
@@ -509,6 +530,7 @@ Costmap2DROS::start()
   std::vector<std::shared_ptr<Layer>> * plugins = layered_costmap_->getPlugins();
   std::vector<std::shared_ptr<Layer>> * filters = layered_costmap_->getFilters();
 
+  // 激活所有 plugins 和 filters
   // check if we're stopped or just paused
   if (stopped_) {
     // if we're stopped we need to re-subscribe to topics
@@ -530,6 +552,7 @@ Costmap2DROS::start()
 
   // block until the costmap is re-initialized.. meaning one update cycle has run
   rclcpp::Rate r(20.0);
+  // 循环等待初始化完成, 也就是 updateMap 的完成
   while (rclcpp::ok() && !initialized_) {
     RCLCPP_DEBUG(get_logger(), "Sleeping, waiting for initialized_");
     r.sleep();
@@ -600,6 +623,7 @@ Costmap2DROS::resetLayers()
 bool
 Costmap2DROS::getRobotPose(geometry_msgs::msg::PoseStamped & global_pose)
 {
+  // 通过 tf 获取机器人位姿
   return nav2_util::getCurrentPose(
     global_pose, *tf_buffer_,
     global_frame_, robot_base_frame_, transform_tolerance_);

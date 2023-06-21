@@ -70,6 +70,7 @@ ObservationBuffer::ObservationBuffer(
   raytrace_max_range_(raytrace_max_range), raytrace_min_range_(
     raytrace_min_range), tf_tolerance_(tf_tolerance)
 {
+  // 获得节点的 clock, logger
   auto node = parent.lock();
   clock_ = node->get_clock();
   logger_ = node->get_logger();
@@ -84,9 +85,11 @@ void ObservationBuffer::bufferCloud(const sensor_msgs::msg::PointCloud2 & cloud)
 {
   geometry_msgs::msg::PointStamped global_origin;
 
+  // 创建一个新的观测, 这个观测是用来填充的
   // create a new observation on the list to be populated
   observation_list_.push_front(Observation());
 
+  // 获取传感器坐标系名称
   // check whether the origin frame has been set explicitly
   // or whether we should get it from the cloud
   std::string origin_frame = sensor_frame_ == "" ? cloud.header.frame_id : sensor_frame_;
@@ -100,9 +103,12 @@ void ObservationBuffer::bufferCloud(const sensor_msgs::msg::PointCloud2 & cloud)
     local_origin.point.x = 0;
     local_origin.point.y = 0;
     local_origin.point.z = 0;
+    // 这是获取传感器观测原点在世界坐标系的位姿
     tf2_buffer_.transform(local_origin, global_origin, global_frame_, tf_tolerance_);
+    // 将原点给到新建的观测
     tf2::convert(global_origin.point, observation_list_.front().origin_);
 
+    // 参数给到新建的观测
     // make sure to pass on the raytrace/obstacle range
     // of the observation buffer to the observations
     observation_list_.front().raytrace_max_range_ = raytrace_max_range_;
@@ -110,12 +116,15 @@ void ObservationBuffer::bufferCloud(const sensor_msgs::msg::PointCloud2 & cloud)
     observation_list_.front().obstacle_max_range_ = obstacle_max_range_;
     observation_list_.front().obstacle_min_range_ = obstacle_min_range_;
 
+    // 创建一个全局点云
     sensor_msgs::msg::PointCloud2 global_frame_cloud;
 
+    // 把这个点云转换到世界坐标系中
     // transform the point cloud
     tf2_buffer_.transform(cloud, global_frame_cloud, global_frame_, tf_tolerance_);
     global_frame_cloud.header.stamp = cloud.header.stamp;
 
+    // 把点云给新建的观测
     // now we need to remove observations from the cloud that are below
     // or above our height thresholds
     sensor_msgs::msg::PointCloud2 & observation_cloud = *(observation_list_.front().cloud_);
@@ -127,11 +136,13 @@ void ObservationBuffer::bufferCloud(const sensor_msgs::msg::PointCloud2 & cloud)
     observation_cloud.row_step = global_frame_cloud.row_step;
     observation_cloud.is_dense = global_frame_cloud.is_dense;
 
+    // 获取到点云的尺寸
     unsigned int cloud_size = global_frame_cloud.height * global_frame_cloud.width;
     sensor_msgs::PointCloud2Modifier modifier(observation_cloud);
     modifier.resize(cloud_size);
     unsigned int point_count = 0;
 
+    // TODO: 没太搞明白点云的操作
     // copy over the points that are within our height bounds
     sensor_msgs::PointCloud2Iterator<float> iter_z(global_frame_cloud, "z");
     std::vector<unsigned char>::const_iterator iter_global = global_frame_cloud.data.begin(),
@@ -167,6 +178,7 @@ void ObservationBuffer::bufferCloud(const sensor_msgs::msg::PointCloud2 & cloud)
   // if the update was successful, we want to update the last updated time
   last_updated_ = clock_->now();
 
+  // 最后把陈旧的观测删掉
   // we'll also remove any stale observations from the list
   purgeStaleObservations();
 }
@@ -180,6 +192,7 @@ void ObservationBuffer::getObservations(std::vector<Observation> & observations)
   // now we'll just copy the observations for the caller
   std::list<Observation>::iterator obs_it;
   for (obs_it = observation_list_.begin(); obs_it != observation_list_.end(); ++obs_it) {
+    // 就是把观测列表里的一个个放到观测里
     observations.push_back(*obs_it);
   }
 }
@@ -190,6 +203,7 @@ void ObservationBuffer::purgeStaleObservations()
     std::list<Observation>::iterator obs_it = observation_list_.begin();
     // if we're keeping observations for no time... then we'll only keep one observation
     if (observation_keep_time_ == rclcpp::Duration(0.0s)) {
+      // 如果我们保存观测的时间为 0, 那么我们只保留最后一个观测
       observation_list_.erase(++obs_it, observation_list_.end());
       return;
     }
@@ -202,6 +216,7 @@ void ObservationBuffer::purgeStaleObservations()
       if ((clock_->now() - obs.cloud_->header.stamp) >
         observation_keep_time_)
       {
+        // 检查观测保留时间过长的就删掉
         observation_list_.erase(obs_it, observation_list_.end());
         return;
       }

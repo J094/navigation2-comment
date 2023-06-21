@@ -52,15 +52,18 @@ void calculateMinAndMaxDistances(
   }
 
   for (unsigned int i = 0; i < footprint.size() - 1; ++i) {
+    // 这里 0 0 为机器人中心
     // check the distance from the robot center point to the first vertex
     double vertex_dist = distance(0.0, 0.0, footprint[i].x, footprint[i].y);
     double edge_dist = distanceToLine(
       0.0, 0.0, footprint[i].x, footprint[i].y,
       footprint[i + 1].x, footprint[i + 1].y);
+    // 更新最大距离和最小距离
     min_dist = std::min(min_dist, std::min(vertex_dist, edge_dist));
     max_dist = std::max(max_dist, std::max(vertex_dist, edge_dist));
   }
 
+  // 最后考虑最后一点和最后一条边的距离
   // we also need to do the last vertex and the first vertex
   double vertex_dist = distance(0.0, 0.0, footprint.back().x, footprint.back().y);
   double edge_dist = distanceToLine(
@@ -99,6 +102,7 @@ geometry_msgs::msg::Polygon toPolygon(std::vector<geometry_msgs::msg::Point> pts
 
 std::vector<geometry_msgs::msg::Point> toPointVector(geometry_msgs::msg::Polygon::SharedPtr polygon)
 {
+  // 把 polygon 转成 vector
   std::vector<geometry_msgs::msg::Point> pts;
   for (unsigned int i = 0; i < polygon->points.size(); i++) {
     pts.push_back(toPoint(polygon->points[i]));
@@ -129,6 +133,7 @@ void transformFootprint(
   const std::vector<geometry_msgs::msg::Point> & footprint_spec,
   geometry_msgs::msg::PolygonStamped & oriented_footprint)
 {
+  // 构建带方向的 footprint, 给定位姿
   // build the oriented footprint at a given location
   oriented_footprint.polygon.points.clear();
   double cos_th = cos(theta);
@@ -137,6 +142,7 @@ void transformFootprint(
     geometry_msgs::msg::Point32 new_pt;
     new_pt.x = x + (footprint_spec[i].x * cos_th - footprint_spec[i].y * sin_th);
     new_pt.y = y + (footprint_spec[i].x * sin_th + footprint_spec[i].y * cos_th);
+    // 每一个点都变换后放入 oriented_footprint
     oriented_footprint.polygon.points.push_back(new_pt);
   }
 }

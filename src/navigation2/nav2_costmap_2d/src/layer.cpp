@@ -63,6 +63,7 @@ Layer::initialize(
     clock_ = node_shared_ptr->get_clock();
   }
 
+  // 以上都是通用初始化, 针对不同的 layer 重写下面函数初始化
   onInitialize();
 }
 

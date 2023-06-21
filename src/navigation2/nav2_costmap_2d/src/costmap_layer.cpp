@@ -82,6 +82,7 @@ void CostmapLayer::clearArea(int start_x, int start_y, int end_x, int end_y, boo
 
 void CostmapLayer::addExtraBounds(double mx0, double my0, double mx1, double my1)
 {
+  // 添加额外的边界, 默认 extra_min 是 -1e6, extra_max 是 1e6
   extra_min_x_ = std::min(mx0, extra_min_x_);
   extra_max_x_ = std::max(mx1, extra_max_x_);
   extra_min_y_ = std::min(my0, extra_min_y_);
@@ -92,13 +93,17 @@ void CostmapLayer::addExtraBounds(double mx0, double my0, double mx1, double my1
 void CostmapLayer::useExtraBounds(double * min_x, double * min_y, double * max_x, double * max_y)
 {
   if (!has_extra_bounds_) {
+    // 没有 extra bounds 不用
     return;
   }
 
+  // 使用 extra bounds 配合更新边界
   *min_x = std::min(extra_min_x_, *min_x);
   *min_y = std::min(extra_min_y_, *min_y);
   *max_x = std::max(extra_max_x_, *max_x);
   *max_y = std::max(extra_max_y_, *max_y);
+
+  // 使用完将额外边界设置为默认
   extra_min_x_ = 1e6;
   extra_min_y_ = 1e6;
   extra_max_x_ = -1e6;
@@ -121,11 +126,14 @@ void CostmapLayer::updateWithMax(
   for (int j = min_j; j < max_j; j++) {
     unsigned int it = j * span + min_i;
     for (int i = min_i; i < max_i; i++) {
+      // 如果当前没有信息, 就不管
       if (costmap_[it] == NO_INFORMATION) {
         it++;
         continue;
       }
 
+      // 如果当前有信息, 并且当前检测的障碍物可能性更高, 则赋值
+      // 相当于只取障碍物可能性高的
       unsigned char old_cost = master_array[it];
       if (old_cost == NO_INFORMATION || old_cost < costmap_[it]) {
         master_array[it] = costmap_[it];
@@ -145,16 +153,22 @@ void CostmapLayer::updateWithTrueOverwrite(
     return;
   }
 
+  // 当前 layer 的 costmap 不能为空
   if (costmap_ == nullptr) {
     throw std::runtime_error("Can't update costmap layer: It has't been initialized yet!");
   }
 
+  // 拿到 master 的 char * map
   unsigned char * master = master_grid.getCharMap();
+  // x 轴的宽度
   unsigned int span = master_grid.getSizeInCellsX();
 
+  // 整个窗口遍历
+  // 将当前 layer 的 costmap 中的数值赋给 master
   for (int j = min_j; j < max_j; j++) {
     unsigned int it = span * j + min_i;
     for (int i = min_i; i < max_i; i++) {
+      // TrueOverwrite 无论有没有信息都覆盖
       master[it] = costmap_[it];
       it++;
     }
@@ -174,6 +188,7 @@ void CostmapLayer::updateWithOverwrite(
   for (int j = min_j; j < max_j; j++) {
     unsigned int it = span * j + min_i;
     for (int i = min_i; i < max_i; i++) {
+      // 只有有信息的才覆盖
       if (costmap_[it] != NO_INFORMATION) {
         master[it] = costmap_[it];
       }
@@ -196,16 +211,20 @@ void CostmapLayer::updateWithAddition(
     unsigned int it = j * span + min_i;
     for (int i = min_i; i < max_i; i++) {
       if (costmap_[it] == NO_INFORMATION) {
+        // 没有信息就跳过
         it++;
         continue;
       }
 
       unsigned char old_cost = master_array[it];
       if (old_cost == NO_INFORMATION) {
+        // 如果本来没信息, 就把获取到的信息给它
         master_array[it] = costmap_[it];
       } else {
+        // 累加
         int sum = old_cost + costmap_[it];
         if (sum >= nav2_costmap_2d::INSCRIBED_INFLATED_OBSTACLE) {
+          // 如果累加到了 INSCRIBED_INFLATED_OBSTACLE 253, 就保持 MAX_NON_OBSTACLE 252
           master_array[it] = nav2_costmap_2d::INSCRIBED_INFLATED_OBSTACLE - 1;
         } else {
           master_array[it] = sum;

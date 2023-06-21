@@ -126,8 +126,11 @@ public:
   {
   }
 
+  // 观测的原点
   geometry_msgs::msg::Point origin_;
+  // 观测的点云
   sensor_msgs::msg::PointCloud2 * cloud_;
+  // 障碍物的合理范围以及扫描清理的合理范围
   double obstacle_max_range_, obstacle_min_range_, raytrace_max_range_, raytrace_min_range_;
 };
 

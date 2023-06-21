@@ -70,9 +70,11 @@ StaticLayer::onInitialize()
 {
   global_frame_ = layered_costmap_->getGlobalFrameID();
 
+  // 获取所需的参数
   getParameters();
 
   rclcpp::QoS map_qos(10);  // initialize to default
+  
   if (map_subscribe_transient_local_) {
     map_qos.transient_local();
     map_qos.reliable();
@@ -90,12 +92,14 @@ StaticLayer::onInitialize()
     throw std::runtime_error{"Failed to lock node"};
   }
 
+  // 这里才是从地图服务器订阅地图
   map_sub_ = node->create_subscription<nav_msgs::msg::OccupancyGrid>(
     map_topic_, map_qos,
     std::bind(&StaticLayer::incomingMap, this, std::placeholders::_1));
 
   if (subscribe_to_updates_) {
     RCLCPP_INFO(logger_, "Subscribing to updates");
+    // 也可以通过订阅的形式来更新地图
     map_update_sub_ = node->create_subscription<map_msgs::msg::OccupancyGridUpdate>(
       map_topic_ + "_updates",
       rclcpp::SystemDefaultsQoS(),
@@ -138,6 +142,7 @@ StaticLayer::getParameters()
     throw std::runtime_error{"Failed to lock node"};
   }
 
+  // 获取参数, 这里带上了 name_
   node->get_parameter(name_ + "." + "enabled", enabled_);
   node->get_parameter(name_ + "." + "subscribe_to_updates", subscribe_to_updates_);
   std::string private_map_topic, global_map_topic;
@@ -158,13 +163,16 @@ StaticLayer::getParameters()
   node->get_parameter("trinary_costmap", trinary_costmap_);
   node->get_parameter("transform_tolerance", temp_tf_tol);
 
+  // 致命的阈值, 这里进行边界限定
   // Enforce bounds
   lethal_threshold_ = std::max(std::min(temp_lethal_threshold, 100), 0);
   map_received_ = false;
   map_received_in_update_bounds_ = false;
 
+  // 这里是 tf 获取的 timeout
   transform_tolerance_ = tf2::durationFromSec(temp_tf_tol);
 
+  // 动态参数配置的回调
   // Add callback for dynamic parameters
   dyn_params_handler_ = node->add_on_set_parameters_callback(
     std::bind(
@@ -177,6 +185,7 @@ StaticLayer::processMap(const nav_msgs::msg::OccupancyGrid & new_map)
 {
   RCLCPP_DEBUG(logger_, "StaticLayer: Process map");
 
+  // 拿到地图长宽
   unsigned int size_x = new_map.info.width;
   unsigned int size_y = new_map.info.height;
 
@@ -185,6 +194,7 @@ StaticLayer::processMap(const nav_msgs::msg::OccupancyGrid & new_map)
     "StaticLayer: Received a %d X %d map at %f m/pix", size_x, size_y,
     new_map.info.resolution);
 
+  // 参数不匹配, 则需要 resize
   // resize costmap if size, resolution or origin do not match
   Costmap2D * master = layered_costmap_->getCostmap();
   if (!layered_costmap_->isRolling() && (master->getSizeInCellsX() != size_x ||
@@ -221,6 +231,7 @@ StaticLayer::processMap(const nav_msgs::msg::OccupancyGrid & new_map)
 
   unsigned int index = 0;
 
+  // 更新地图信息, 保存到 char * 地图中
   // we have a new map, update full size of map
   std::lock_guard<Costmap2D::mutex_t> guard(*getMutex());
 
@@ -228,28 +239,35 @@ StaticLayer::processMap(const nav_msgs::msg::OccupancyGrid & new_map)
   for (unsigned int i = 0; i < size_y; ++i) {
     for (unsigned int j = 0; j < size_x; ++j) {
       unsigned char value = new_map.data[index];
+      // 把地图 cost 转译到 costmap 表示形式
       costmap_[index] = interpretValue(value);
       ++index;
     }
   }
 
+  // 拿到 map frame
   map_frame_ = new_map.header.frame_id;
 
+  // 在 map frame 下原点是 0 0
   x_ = y_ = 0;
   width_ = size_x_;
   height_ = size_y_;
+  // 表明地图更新过了
   has_updated_data_ = true;
 
+  // 表明地图是当前的
   current_ = true;
 }
 
 void
 StaticLayer::matchSize()
 {
+  // 如果是 rolling, 静态地图的尺寸和 layered costmap 的尺寸不想关
   // If we are using rolling costmap, the static map size is
   //   unrelated to the size of the layered costmap
   if (!layered_costmap_->isRolling()) {
     Costmap2D * master = layered_costmap_->getCostmap();
+    // 这里用的是 Costmap2D 中的函数, 重置了 map
     resizeMap(
       master->getSizeInCellsX(), master->getSizeInCellsY(), master->getResolution(),
       master->getOriginX(), master->getOriginY());
@@ -270,6 +288,7 @@ StaticLayer::interpretValue(unsigned char value)
     return FREE_SPACE;
   }
 
+  // 线性变换
   double scale = static_cast<double>(value) / lethal_threshold_;
   return scale * LETHAL_OBSTACLE;
 }
@@ -278,10 +297,12 @@ void
 StaticLayer::incomingMap(const nav_msgs::msg::OccupancyGrid::SharedPtr new_map)
 {
   if (!map_received_) {
+    // 如果 map 是第一次获取, 先要处理地图
     processMap(*new_map);
     map_received_ = true;
     return;
   }
+  // 修改成员变量先锁住, 这里直接把新来的地图放到 buffer 中, 待后续处理
   std::lock_guard<Costmap2D::mutex_t> guard(*getMutex());
   map_buffer_ = new_map;
 }
@@ -295,6 +316,7 @@ StaticLayer::incomingUpdate(map_msgs::msg::OccupancyGridUpdate::ConstSharedPtr u
     update->x < static_cast<int32_t>(x_) ||
     x_ + width_ < update->x + update->width)
   {
+    // 这就是 update 的尺寸在当前地图外
     RCLCPP_WARN(
       logger_,
       "StaticLayer: Map update ignored. Exceeds bounds of static layer.\n"
@@ -305,6 +327,7 @@ StaticLayer::incomingUpdate(map_msgs::msg::OccupancyGridUpdate::ConstSharedPtr u
     return;
   }
 
+  // update 的和当前的 frame 应该一致
   if (update->header.frame_id != map_frame_) {
     RCLCPP_WARN(
       logger_,
@@ -315,13 +338,16 @@ StaticLayer::incomingUpdate(map_msgs::msg::OccupancyGridUpdate::ConstSharedPtr u
 
   unsigned int di = 0;
   for (unsigned int y = 0; y < update->height; y++) {
+    // 更新的部分 index 计算, 这里先遍历 y 轴
     unsigned int index_base = (update->y + y) * size_x_;
     for (unsigned int x = 0; x < update->width; x++) {
+      // 再遍历 x 轴获得最终 index, 相当于一行一行修改
       unsigned int index = index_base + x + update->x;
       costmap_[index] = interpretValue(update->data[di++]);
     }
   }
 
+  // 表明地图更新过了
   has_updated_data_ = true;
 }
 
@@ -334,6 +360,7 @@ StaticLayer::updateBounds(
   double * max_y)
 {
   if (!map_received_) {
+    // 没有地图的时候不更新
     map_received_in_update_bounds_ = false;
     return;
   }
@@ -341,22 +368,26 @@ StaticLayer::updateBounds(
 
   std::lock_guard<Costmap2D::mutex_t> guard(*getMutex());
 
+  // 如果有更新的地图, 用 buffer 里的地图
   // If there is a new available map, load it.
   if (map_buffer_) {
     processMap(*map_buffer_);
     map_buffer_ = nullptr;
   }
 
+  // 不是 rolling 并且没有额外边界并且没有更新地图, 是不需要更新静态地图的边界
   if (!layered_costmap_->isRolling() ) {
     if (!(has_updated_data_ || has_extra_bounds_)) {
       return;
     }
   }
 
+  // 如果有额外边界
   useExtraBounds(min_x, min_y, max_x, max_y);
 
   double wx, wy;
 
+  // 当前地图边界点变换到世界点上, 然后更新边界
   mapToWorld(x_, y_, wx, wy);
   *min_x = std::min(wx, *min_x);
   *min_y = std::min(wy, *min_y);
@@ -365,6 +396,7 @@ StaticLayer::updateBounds(
   *max_x = std::max(wx, *max_x);
   *max_y = std::max(wy, *max_y);
 
+  // 只更新了地图边界, 没有更新 cost 数据
   has_updated_data_ = false;
 }
 
@@ -373,11 +405,13 @@ StaticLayer::updateCosts(
   nav2_costmap_2d::Costmap2D & master_grid,
   int min_i, int min_j, int max_i, int max_j)
 {
+  // 这里使用当前的值来更新 master grid 的值
   std::lock_guard<Costmap2D::mutex_t> guard(*getMutex());
   if (!enabled_) {
     return;
   }
   if (!map_received_in_update_bounds_) {
+    // 需要获得地图, 并且更新了边界
     static int count = 0;
     // throttle warning down to only 1/10 message rate
     if (++count == 10) {
@@ -388,13 +422,18 @@ StaticLayer::updateCosts(
   }
 
   if (!layered_costmap_->isRolling()) {
+    // 如果不是 rolling, master grid 应该和 static map 保持相同的坐标
     // if not rolling, the layered costmap (master_grid) has same coordinates as this layer
     if (!use_maximum_) {
+      // 直接覆盖
       updateWithTrueOverwrite(master_grid, min_i, min_j, max_i, max_j);
     } else {
+      // 使用 max 值
       updateWithMax(master_grid, min_i, min_j, max_i, max_j);
     }
   } else {
+    // TODO: 没搞明白 rolling 模式
+    // 如果是 rolling, master grid 和 static map 的坐标就不相同了
     // If rolling window, the master_grid is unlikely to have same coordinates as this layer
     unsigned int mx, my;
     double wx, wy;
@@ -430,6 +469,7 @@ StaticLayer::updateCosts(
       }
     }
   }
+  // 更新完 cost 就表示是最新的
   current_ = true;
 }
 
@@ -441,6 +481,7 @@ rcl_interfaces::msg::SetParametersResult
 StaticLayer::dynamicParametersCallback(
   std::vector<rclcpp::Parameter> parameters)
 {
+  // 锁住当前, 更新完参数才释放
   std::lock_guard<Costmap2D::mutex_t> guard(*getMutex());
   rcl_interfaces::msg::SetParametersResult result;
 
@@ -452,6 +493,7 @@ StaticLayer::dynamicParametersCallback(
       param_name == name_ + "." + "map_topic" ||
       param_name == name_ + "." + "subscribe_to_updates")
     {
+      // 有一些不能改
       RCLCPP_WARN(
         logger_, "%s is not a dynamic parameter "
         "cannot be changed while running. Rejecting parameter update.", param_name.c_str());

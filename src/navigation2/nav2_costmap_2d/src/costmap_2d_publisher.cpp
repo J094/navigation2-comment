@@ -77,6 +77,7 @@ Costmap2DPublisher::Costmap2DPublisher(
   costmap_update_pub_ = node->create_publisher<map_msgs::msg::OccupancyGridUpdate>(
     topic_name + "_updates", custom_qos);
 
+  // 还有一个获取 costmap 的服务
   // Create a service that will use the callback function to handle requests.
   costmap_service_ = node->create_service<nav2_msgs::srv::GetCostmap>(
     "get_costmap", std::bind(
@@ -93,6 +94,7 @@ Costmap2DPublisher::Costmap2DPublisher(
     cost_translation_table_[254] = 100;  // LETHAL obstacle
     cost_translation_table_[255] = -1;  // UNKNOWN
 
+    // 线性映射
     // regular cost values scale the range 1 to 252 (inclusive) to fit
     // into 1 to 98 (inclusive).
     for (int i = 1; i < 253; i++) {
@@ -181,6 +183,7 @@ void Costmap2DPublisher::prepareCostmap()
   }
 }
 
+// 主要是发布 costmap 的可视化
 void Costmap2DPublisher::publishCostmap()
 {
   if (costmap_raw_pub_->get_subscription_count() > 0) {
@@ -257,6 +260,7 @@ Costmap2DPublisher::costmap_service_callback(
   response->map.metadata.origin.position.y = costmap_->getOriginY();
   response->map.metadata.origin.position.z = 0.0;
   response->map.metadata.origin.orientation = tf2::toMsg(quaternion);
+  // 这里把 data 反馈回去
   response->map.data.resize(data_length);
   response->map.data.assign(data, data + data_length);
 }

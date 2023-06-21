@@ -71,9 +71,11 @@ LayeredCostmap::LayeredCostmap(std::string global_frame, bool rolling_window, bo
   inscribed_radius_(0.1)
 {
   if (track_unknown) {
+    // 如果是在未知空间探索, 那么开始都是未知的 NO_INFOMATION
     primary_costmap_.setDefaultValue(255);
     combined_costmap_.setDefaultValue(255);
   } else {
+    // 如果是已知的, 那么开始都认为是可通行区域 FREE_SPACE
     primary_costmap_.setDefaultValue(0);
     combined_costmap_.setDefaultValue(0);
   }
@@ -81,6 +83,7 @@ LayeredCostmap::LayeredCostmap(std::string global_frame, bool rolling_window, bo
 
 LayeredCostmap::~LayeredCostmap()
 {
+  // 析构清空 plugins 和 filters
   while (plugins_.size() > 0) {
     plugins_.pop_back();
   }
@@ -91,6 +94,8 @@ LayeredCostmap::~LayeredCostmap()
 
 void LayeredCostmap::addPlugin(std::shared_ptr<Layer> plugin)
 {
+  // TODO: 貌似没有对 combined_costmap 造成直接修改, 为啥要锁?
+  // 先锁住, 然后添加 plugin
   std::unique_lock<Costmap2D::mutex_t> lock(*(combined_costmap_.getMutex()));
   plugins_.push_back(plugin);
 }
@@ -101,10 +106,14 @@ void LayeredCostmap::resizeMap(
   double origin_y,
   bool size_locked)
 {
+  // 先锁住
   std::unique_lock<Costmap2D::mutex_t> lock(*(combined_costmap_.getMutex()));
   size_locked_ = size_locked;
+  // resize 两个 costmap
   primary_costmap_.resizeMap(size_x, size_y, resolution, origin_x, origin_y);
   combined_costmap_.resizeMap(size_x, size_y, resolution, origin_x, origin_y);
+
+  // 这里又要 resize 所有 plugins 和 filters, 为了让他们的 size 和变化后的 costmap 对应
   for (vector<std::shared_ptr<Layer>>::iterator plugin = plugins_.begin();
     plugin != plugins_.end(); ++plugin)
   {
@@ -113,6 +122,7 @@ void LayeredCostmap::resizeMap(
   for (vector<std::shared_ptr<Layer>>::iterator filter = filters_.begin();
     filter != filters_.end(); ++filter)
   {
+    // TODO: 这里奇怪, filter 明明没有实现 matchSize, 或者根本不需要?
     (*filter)->matchSize();
   }
 }
@@ -125,10 +135,12 @@ bool LayeredCostmap::isOutofBounds(double robot_x, double robot_y)
 
 void LayeredCostmap::updateMap(double robot_x, double robot_y, double robot_yaw)
 {
+  // 锁住 costmap, 在更新完地图前不让其改变
   // Lock for the remainder of this function, some plugins (e.g. VoxelLayer)
   // implement thread unsafe updateBounds() functions.
   std::unique_lock<Costmap2D::mutex_t> lock(*(combined_costmap_.getMutex()));
 
+  // 如果是 rolling window, 那么地图原点应该跟着机器人移动, 机器人位置为地图中心
   // if we're using a rolling buffer costmap...
   // we need to update the origin using the robot's position
   if (rolling_window_) {
@@ -138,27 +150,35 @@ void LayeredCostmap::updateMap(double robot_x, double robot_y, double robot_yaw)
     combined_costmap_.updateOrigin(new_origin_x, new_origin_y);
   }
 
+  // 检查机器人是否出界
   if (isOutofBounds(robot_x, robot_y)) {
     RCLCPP_WARN(
       rclcpp::get_logger("nav2_costmap_2d"),
       "Robot is out of bounds of the costmap!");
   }
 
+  // 如果没有 plugins 和 filters 就没必要更新
   if (plugins_.size() == 0 && filters_.size() == 0) {
     return;
   }
 
+  // 获取 double 的下界和上界
+  // TODO: 为啥这么搞一下?
   minx_ = miny_ = std::numeric_limits<double>::max();
   maxx_ = maxy_ = std::numeric_limits<double>::lowest();
 
+  // 遍历所有 plugin
   for (vector<std::shared_ptr<Layer>>::iterator plugin = plugins_.begin();
     plugin != plugins_.end(); ++plugin)
   {
+    // 保存更新前的边界
     double prev_minx = minx_;
     double prev_miny = miny_;
     double prev_maxx = maxx_;
     double prev_maxy = maxy_;
+    // 更新边界
     (*plugin)->updateBounds(robot_x, robot_y, robot_yaw, &minx_, &miny_, &maxx_, &maxy_);
+    // TODO: 很奇怪, 第一次 minx 和 maxx 取的都是 double 的下界和上界, 那么第一个循环不是必然进这个条件?
     if (minx_ > prev_minx || miny_ > prev_miny || maxx_ < prev_maxx || maxy_ < prev_maxy) {
       RCLCPP_WARN(
         rclcpp::get_logger(
@@ -169,6 +189,7 @@ void LayeredCostmap::updateMap(double robot_x, double robot_y, double robot_yaw)
         (*plugin)->getName().c_str());
     }
   }
+  // 遍历所有 filter
   for (vector<std::shared_ptr<Layer>>::iterator filter = filters_.begin();
     filter != filters_.end(); ++filter)
   {
@@ -176,6 +197,7 @@ void LayeredCostmap::updateMap(double robot_x, double robot_y, double robot_yaw)
     double prev_miny = miny_;
     double prev_maxx = maxx_;
     double prev_maxy = maxy_;
+    // 更新边界
     (*filter)->updateBounds(robot_x, robot_y, robot_yaw, &minx_, &miny_, &maxx_, &maxy_);
     if (minx_ > prev_minx || miny_ > prev_miny || maxx_ < prev_maxx || maxy_ < prev_maxy) {
       RCLCPP_WARN(
@@ -188,6 +210,7 @@ void LayeredCostmap::updateMap(double robot_x, double robot_y, double robot_yaw)
     }
   }
 
+  // 把边界投射到地图上的坐标
   int x0, xn, y0, yn;
   combined_costmap_.worldToMapEnforceBounds(minx_, miny_, x0, y0);
   combined_costmap_.worldToMapEnforceBounds(maxx_, maxy_, xn, yn);
@@ -206,15 +229,20 @@ void LayeredCostmap::updateMap(double robot_x, double robot_y, double robot_yaw)
   }
 
   if (filters_.size() == 0) {
+    // 如果没有 filters, 就只更新 plugins 就可以
     // If there are no filters enabled just update costmap sequentially by each plugin
+    // 重新设置地图指定局域内的地图
     combined_costmap_.resetMap(x0, y0, xn, yn);
+    // 遍历更新指定区域内的 cost
     for (vector<std::shared_ptr<Layer>>::iterator plugin = plugins_.begin();
       plugin != plugins_.end(); ++plugin)
     {
       (*plugin)->updateCosts(combined_costmap_, x0, y0, xn, yn);
     }
   } else {
+    // 如果启用了 filters
     // Costmap Filters enabled
+    // 先遍历 plugin 更新指定区域的 cost, 这里是 primary costmap
     // 1. Update costmap by plugins
     primary_costmap_.resetMap(x0, y0, xn, yn);
     for (vector<std::shared_ptr<Layer>>::iterator plugin = plugins_.begin();
@@ -223,6 +251,7 @@ void LayeredCostmap::updateMap(double robot_x, double robot_y, double robot_yaw)
       (*plugin)->updateCosts(primary_costmap_, x0, y0, xn, yn);
     }
 
+    // 把 primary costmap 的更新区域复制到 combined costmap
     // 2. Copy processed costmap window to a final costmap.
     // primary_costmap_ remain to be untouched for further usage by plugins.
     if (!combined_costmap_.copyWindow(primary_costmap_, x0, y0, xn, yn, x0, y0)) {
@@ -233,6 +262,7 @@ void LayeredCostmap::updateMap(double robot_x, double robot_y, double robot_yaw)
       throw std::runtime_error{"Can not copy costmap"};
     }
 
+    // 最后使用 filter 对 combined costmap 做处理
     // 3. Apply filters over the plugins in order to make filters' work
     // not being considered by plugins on next updateMap() calls
     for (vector<std::shared_ptr<Layer>>::iterator filter = filters_.begin();
@@ -252,6 +282,7 @@ void LayeredCostmap::updateMap(double robot_x, double robot_y, double robot_yaw)
 
 bool LayeredCostmap::isCurrent()
 {
+  // 确保所有的 plugins 和 filters 都是 current, 所有数据都是及时更新的
   current_ = true;
   for (vector<std::shared_ptr<Layer>>::iterator plugin = plugins_.begin();
     plugin != plugins_.end(); ++plugin)
@@ -269,10 +300,12 @@ bool LayeredCostmap::isCurrent()
 void LayeredCostmap::setFootprint(const std::vector<geometry_msgs::msg::Point> & footprint_spec)
 {
   footprint_ = footprint_spec;
+  // 计算内接圆和外接圆的半径, 基于 footprint
   nav2_costmap_2d::calculateMinAndMaxDistances(
     footprint_spec,
     inscribed_radius_, circumscribed_radius_);
 
+  // 遍历 plugins 和 filters, 随着 footprint 改变更新
   for (vector<std::shared_ptr<Layer>>::iterator plugin = plugins_.begin();
     plugin != plugins_.end();
     ++plugin)
