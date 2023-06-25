@@ -582,6 +582,7 @@ protected:
     }
     inline void operator()(unsigned int offset)
     {
+      // 在指定的 offset 上赋值
       costmap_[offset] = value_;
     }
 

@@ -47,6 +47,7 @@ void CostmapLayer::touch(
   double x, double y, double * min_x, double * min_y, double * max_x,
   double * max_y)
 {
+  // 这里是获得包围住 x y 坐标的最小 bbox
   *min_x = std::min(x, *min_x);
   *min_y = std::min(y, *min_y);
   *max_x = std::max(x, *max_x);

@@ -163,7 +163,7 @@ void LayeredCostmap::updateMap(double robot_x, double robot_y, double robot_yaw)
   }
 
   // 获取 double 的下界和上界
-  // TODO: 为啥这么搞一下?
+  // 获取所有感知范围的外接矩形框 bbox
   minx_ = miny_ = std::numeric_limits<double>::max();
   maxx_ = maxy_ = std::numeric_limits<double>::lowest();
 
@@ -171,14 +171,16 @@ void LayeredCostmap::updateMap(double robot_x, double robot_y, double robot_yaw)
   for (vector<std::shared_ptr<Layer>>::iterator plugin = plugins_.begin();
     plugin != plugins_.end(); ++plugin)
   {
-    // 保存更新前的边界
+    // 保存更新前的 bbox
     double prev_minx = minx_;
     double prev_miny = miny_;
     double prev_maxx = maxx_;
     double prev_maxy = maxy_;
-    // 更新边界
+    // 更新地图和 bbox
     (*plugin)->updateBounds(robot_x, robot_y, robot_yaw, &minx_, &miny_, &maxx_, &maxy_);
-    // TODO: 很奇怪, 第一次 minx 和 maxx 取的都是 double 的下界和上界, 那么第一个循环不是必然进这个条件?
+    // 当前的 min 应该小于等于之前的 min, 当前的 max 应该大于等于之前的 max
+    // 因为 bbox 在 touch 的时候都是扩张, bbox 代表了参与过更新的区域
+    // 如果有静态地图参与, 那么 bbox 所有地图的外接矩形框
     if (minx_ > prev_minx || miny_ > prev_miny || maxx_ < prev_maxx || maxy_ < prev_maxy) {
       RCLCPP_WARN(
         rclcpp::get_logger(
@@ -197,7 +199,7 @@ void LayeredCostmap::updateMap(double robot_x, double robot_y, double robot_yaw)
     double prev_miny = miny_;
     double prev_maxx = maxx_;
     double prev_maxy = maxy_;
-    // 更新边界
+    // 更新
     (*filter)->updateBounds(robot_x, robot_y, robot_yaw, &minx_, &miny_, &maxx_, &maxy_);
     if (minx_ > prev_minx || miny_ > prev_miny || maxx_ < prev_maxx || maxy_ < prev_maxy) {
       RCLCPP_WARN(
@@ -210,7 +212,7 @@ void LayeredCostmap::updateMap(double robot_x, double robot_y, double robot_yaw)
     }
   }
 
-  // 把边界投射到地图上的坐标
+  // 把 bbox 投射到地图上的坐标
   int x0, xn, y0, yn;
   combined_costmap_.worldToMapEnforceBounds(minx_, miny_, x0, y0);
   combined_costmap_.worldToMapEnforceBounds(maxx_, maxy_, xn, yn);
@@ -232,6 +234,7 @@ void LayeredCostmap::updateMap(double robot_x, double robot_y, double robot_yaw)
     // 如果没有 filters, 就只更新 plugins 就可以
     // If there are no filters enabled just update costmap sequentially by each plugin
     // 重新设置地图指定局域内的地图
+    // 相当于每次更新地图都是全部重新更新一遍
     combined_costmap_.resetMap(x0, y0, xn, yn);
     // 遍历更新指定区域内的 cost
     for (vector<std::shared_ptr<Layer>>::iterator plugin = plugins_.begin();
@@ -272,6 +275,7 @@ void LayeredCostmap::updateMap(double robot_x, double robot_y, double robot_yaw)
     }
   }
 
+  // 最后更新和保存最新的 bbox
   bx0_ = x0;
   bxn_ = xn;
   by0_ = y0;
@@ -283,6 +287,7 @@ void LayeredCostmap::updateMap(double robot_x, double robot_y, double robot_yaw)
 bool LayeredCostmap::isCurrent()
 {
   // 确保所有的 plugins 和 filters 都是 current, 所有数据都是及时更新的
+  // 实际都是检查更新频率都满足需求
   current_ = true;
   for (vector<std::shared_ptr<Layer>>::iterator plugin = plugins_.begin();
     plugin != plugins_.end(); ++plugin)

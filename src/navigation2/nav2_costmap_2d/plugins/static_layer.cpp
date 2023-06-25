@@ -387,7 +387,7 @@ StaticLayer::updateBounds(
 
   double wx, wy;
 
-  // 当前地图边界点变换到世界点上, 然后更新边界
+  // 当前地图边界点变换到世界点上, 然后更新 bbox
   mapToWorld(x_, y_, wx, wy);
   *min_x = std::min(wx, *min_x);
   *min_y = std::min(wy, *min_y);

@@ -192,6 +192,7 @@ protected:
   bool getClearingObservations(
     std::vector<nav2_costmap_2d::Observation> & clearing_observations) const;
 
+  // 基于一个观测来清理自由区域
   /**
    * @brief  Clear freespace based on one observation
    * @param clearing_observation The observation used to raytrace
@@ -237,6 +238,7 @@ protected:
   observation_subscribers_;
   /// @brief Used to make sure that transforms are available for each sensor
   std::vector<std::shared_ptr<tf2_ros::MessageFilterBase>> observation_notifiers_;
+  // 观测的缓存, 这里定义了很多缓存, 每一个缓存里面还有很多观测
   /// @brief Used to store observations from various sensors
   std::vector<std::shared_ptr<nav2_costmap_2d::ObservationBuffer>> observation_buffers_;
   /// @brief Used to store observation buffers used for marking obstacles

@@ -142,18 +142,22 @@ void ObservationBuffer::bufferCloud(const sensor_msgs::msg::PointCloud2 & cloud)
     modifier.resize(cloud_size);
     unsigned int point_count = 0;
 
-    // TODO: 没太搞明白点云的操作
     // copy over the points that are within our height bounds
+    // 首先按照高度过滤, 获取合适高度的数据, 这里是遍历 z 轴的数据
     sensor_msgs::PointCloud2Iterator<float> iter_z(global_frame_cloud, "z");
+    // 获得的点云数据的 iterator
     std::vector<unsigned char>::const_iterator iter_global = global_frame_cloud.data.begin(),
       iter_global_end = global_frame_cloud.data.end();
+    // 新观测数据的 iterator
     std::vector<unsigned char>::iterator iter_obs = observation_cloud.data.begin();
+    // 遍历获得的点云数据
     for (; iter_global != iter_global_end; ++iter_z, iter_global +=
       global_frame_cloud.point_step)
     {
       if ((*iter_z) <= max_obstacle_height_ &&
         (*iter_z) >= min_obstacle_height_)
       {
+        // 这里是把合适的数据复制到新观测点云数据中
         std::copy(iter_global, iter_global + global_frame_cloud.point_step, iter_obs);
         iter_obs += global_frame_cloud.point_step;
         ++point_count;
@@ -161,6 +165,7 @@ void ObservationBuffer::bufferCloud(const sensor_msgs::msg::PointCloud2 & cloud)
     }
 
     // resize the cloud for the number of legal points
+    // 根据筛选过的点修改点云尺寸
     modifier.resize(point_count);
     observation_cloud.header.stamp = cloud.header.stamp;
     observation_cloud.header.frame_id = global_frame_cloud.header.frame_id;
@@ -175,6 +180,7 @@ void ObservationBuffer::bufferCloud(const sensor_msgs::msg::PointCloud2 & cloud)
     return;
   }
 
+  // 记录更新时间
   // if the update was successful, we want to update the last updated time
   last_updated_ = clock_->now();
 
@@ -183,9 +189,11 @@ void ObservationBuffer::bufferCloud(const sensor_msgs::msg::PointCloud2 & cloud)
   purgeStaleObservations();
 }
 
+// 返回观测的复制
 // returns a copy of the observations
 void ObservationBuffer::getObservations(std::vector<Observation> & observations)
 {
+  // 确保没有过时的观测
   // first... let's make sure that we don't have any stale observations
   purgeStaleObservations();
 
@@ -230,6 +238,7 @@ bool ObservationBuffer::isCurrent() const
     return true;
   }
 
+  // 确保按照预期频率更新
   bool current = (clock_->now() - last_updated_) <=
     expected_update_rate_;
   if (!current) {
