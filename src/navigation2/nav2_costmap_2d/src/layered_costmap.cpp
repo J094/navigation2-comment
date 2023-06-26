@@ -306,6 +306,7 @@ void LayeredCostmap::setFootprint(const std::vector<geometry_msgs::msg::Point> &
 {
   footprint_ = footprint_spec;
   // 计算内接圆和外接圆的半径, 基于 footprint
+  // inscribed_radius_ 距离机器人中心
   nav2_costmap_2d::calculateMinAndMaxDistances(
     footprint_spec,
     inscribed_radius_, circumscribed_radius_);

@@ -183,11 +183,11 @@ void Costmap2DPublisher::prepareCostmap()
   }
 }
 
-// 主要是发布 costmap 的可视化
 void Costmap2DPublisher::publishCostmap()
 {
   if (costmap_raw_pub_->get_subscription_count() > 0) {
     prepareCostmap();
+    // 发布原始地图
     costmap_raw_pub_->publish(std::move(costmap_raw_));
   }
   float resolution = costmap_->getResolution();
@@ -200,6 +200,7 @@ void Costmap2DPublisher::publishCostmap()
   {
     if (costmap_pub_->get_subscription_count() > 0) {
       prepareGrid();
+      // 发布 OccupancyGrid, 这是经过 costmap_2d 处理过后的地图
       costmap_pub_->publish(std::move(grid_));
     }
   } else if (x0_ < xn_) {
@@ -221,6 +222,7 @@ void Costmap2DPublisher::publishCostmap()
           update->data[i++] = cost_translation_table_[cost];
         }
       }
+      // 发布 OccupancyGridUpdate 地图更新
       costmap_update_pub_->publish(std::move(update));
     }
   }

@@ -280,6 +280,7 @@ Costmap2DROS::on_activate(const rclcpp_lifecycle::State & /*state*/)
   stopped_ = true;  // to active plugins
   stop_updates_ = false;
   map_update_thread_shutdown_ = false;
+  // 按照地图更新频率更新地图
   map_update_thread_ = std::make_unique<std::thread>(
     std::bind(&Costmap2DROS::mapUpdateLoop, this, map_update_frequency_));
 
@@ -467,14 +468,18 @@ Costmap2DROS::mapUpdateLoop(double frequency)
       RCLCPP_DEBUG(get_logger(), "Map update time: %.9f", timer.elapsed_time_in_seconds());
       if (publish_cycle_ > rclcpp::Duration(0s) && layered_costmap_->isInitialized()) {
         unsigned int x0, y0, xn, yn;
+        // 获取地图边界
         layered_costmap_->getBounds(&x0, &xn, &y0, &yn);
+        // 更新地图发布的地图边界
         costmap_publisher_->updateBounds(x0, xn, y0, yn);
 
         auto current_time = now();
+        // 发布周期超过了, 或者当前时间小于上次发布的时间, 表示出了点问题, 需要发布地图更新
         if ((last_publish_ + publish_cycle_ < current_time) ||  // publish_cycle_ is due
           (current_time < last_publish_))      // time has moved backwards, probably due to a switch to sim_time // NOLINT
         {
           RCLCPP_DEBUG(get_logger(), "Publish costmap at %s", name_.c_str());
+          // 发布地图
           costmap_publisher_->publishCostmap();
           last_publish_ = current_time;
         }

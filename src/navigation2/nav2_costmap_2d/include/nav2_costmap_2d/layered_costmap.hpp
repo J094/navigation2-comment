@@ -186,6 +186,7 @@ public:
     return initialized_;
   }
 
+  // 更新机器人轮廓, 更新相关半径
   /** @brief Updates the stored footprint, updates the circumscribed
    * and inscribed radii, and calls onFootprintChanged() in all
    * layers. */

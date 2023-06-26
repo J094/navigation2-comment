@@ -179,7 +179,7 @@ void
 InflationLayer::onFootprintChanged()
 {
   std::lock_guard<Costmap2D::mutex_t> guard(*getMutex());
-  // TODO: 为什么要重新膨胀?
+  // TODO: 为什么要重新膨胀? 这里最小接触半径对于膨胀半径没有影响
   inscribed_radius_ = layered_costmap_->getInscribedRadius();
   // 获得膨胀半径
   cell_inflation_radius_ = cellDistance(inflation_radius_);
