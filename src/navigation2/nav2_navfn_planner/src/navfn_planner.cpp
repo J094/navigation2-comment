@@ -48,7 +48,7 @@ namespace nav2_navfn_planner
 {
 
 NavfnPlanner::NavfnPlanner()
-: tf_(nullptr), costmap_(nullptr)
+: tf_(nullptr), costmap_(nullptr)  // 初始化为 nullptr
 {
 }
 
@@ -67,9 +67,11 @@ NavfnPlanner::configure(
 {
   tf_ = tf;
   name_ = name;
+  // 获取到最新的地图
   costmap_ = costmap_ros->getCostmap();
   global_frame_ = costmap_ros->getGlobalFrameID();
 
+  // 这是使用该插件的节点
   node_ = parent;
   auto node = parent.lock();
   clock_ = node->get_clock();
@@ -91,6 +93,7 @@ NavfnPlanner::configure(
     node, name + ".use_final_approach_orientation", rclcpp::ParameterValue(false));
   node->get_parameter(name + ".use_final_approach_orientation", use_final_approach_orientation_);
 
+  // 这里创建规划器
   // Create a planner based on the new costmap size
   planner_ = std::make_unique<NavFn>(
     costmap_->getSizeInCellsX(),
@@ -135,6 +138,7 @@ nav_msgs::msg::Path NavfnPlanner::createPlan(
   steady_clock::time_point a = steady_clock::now();
 #endif
 
+  // 根据新的 costmap 尺寸来更新规划器
   // Update planner based on the new costmap size
   if (isPlannerOutOfDate()) {
     planner_->setNavArr(
@@ -144,6 +148,7 @@ nav_msgs::msg::Path NavfnPlanner::createPlan(
 
   nav_msgs::msg::Path path;
 
+  // 处理起点等于终点的情况
   // Corner case of the start(x,y) = goal(x,y)
   if (start.pose.position.x == goal.pose.position.x &&
     start.pose.position.y == goal.pose.position.y)
@@ -151,6 +156,7 @@ nav_msgs::msg::Path NavfnPlanner::createPlan(
     unsigned int mx, my;
     costmap_->worldToMap(start.pose.position.x, start.pose.position.y, mx, my);
     if (costmap_->getCost(mx, my) == nav2_costmap_2d::LETHAL_OBSTACLE) {
+      // 起点是障碍物内部, 无法规划
       RCLCPP_WARN(logger_, "Failed to create a unique pose path because of obstacles");
       return path;
     }
@@ -171,6 +177,7 @@ nav_msgs::msg::Path NavfnPlanner::createPlan(
     return path;
   }
 
+  // 真正在这里规划
   if (!makePlan(start.pose, goal.pose, tolerance_, path)) {
     RCLCPP_WARN(
       logger_, "%s: failed to create plan with "
@@ -194,6 +201,7 @@ NavfnPlanner::isPlannerOutOfDate()
     planner_->nx != static_cast<int>(costmap_->getSizeInCellsX()) ||
     planner_->ny != static_cast<int>(costmap_->getSizeInCellsY()))
   {
+    // 这里检查到尺寸不对
     return true;
   }
   return false;
@@ -221,6 +229,7 @@ NavfnPlanner::makePlan(
     start.position.x, start.position.y, goal.position.x, goal.position.y);
 
   unsigned int mx, my;
+  // 转换起点到地图坐标
   if (!worldToMap(wx, wy, mx, my)) {
     RCLCPP_WARN(
       logger_,
@@ -230,16 +239,19 @@ NavfnPlanner::makePlan(
     return false;
   }
 
+  // 起点不是障碍物, 直接清空
   // clear the starting cell within the costmap because we know it can't be an obstacle
   clearRobotCell(mx, my);
 
   std::unique_lock<nav2_costmap_2d::Costmap2D::mutex_t> lock(*(costmap_->getMutex()));
 
+  // 再一次更新规划器的地图尺寸
   // make sure to resize the underlying array that Navfn uses
   planner_->setNavArr(
     costmap_->getSizeInCellsX(),
     costmap_->getSizeInCellsY());
 
+  // 设置规划器的地图
   planner_->setCostmap(costmap_->getCharMap(), true, allow_unknown_);
 
   lock.unlock();
@@ -266,8 +278,10 @@ NavfnPlanner::makePlan(
   // TODO(orduno): Explain why we are providing 'map_goal' to setStart().
   //               Same for setGoal, seems reversed. Computing backwards?
 
+  // 给规划器设置起点和终点
   planner_->setStart(map_goal);
   planner_->setGoal(map_start);
+  // 根据需求实际规划路径
   if (use_astar_) {
     planner_->calcNavFnAstar();
   } else {
@@ -309,6 +323,7 @@ NavfnPlanner::makePlan(
 
   if (found_legal) {
     // extract the plan
+    // 这里获取规划的 plan
     if (getPlanFromPotential(best_pose, plan)) {
       smoothApproachToGoal(best_pose, plan);
 
@@ -521,6 +536,7 @@ NavfnPlanner::clearRobotCell(unsigned int mx, unsigned int my)
 {
   // TODO(orduno): check usage of this function, might instead be a request to
   //               world_model / map server
+  // 这里把起点设置为自由区域
   costmap_->setCost(mx, my, nav2_costmap_2d::FREE_SPACE);
 }
 

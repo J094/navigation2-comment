@@ -27,6 +27,7 @@
 namespace nav2_core
 {
 
+// 全局规划器的抽象类, 如果想自己写插件需要继承这个类
 /**
  * @class GlobalPlanner
  * @brief Abstract interface for global planners to adhere to with pluginlib
@@ -67,6 +68,7 @@ public:
    */
   virtual void deactivate() = 0;
 
+  // 创建路径
   /**
    * @brief Method create the plan from a starting and ending goal.
    * @param start The starting pose of the robot

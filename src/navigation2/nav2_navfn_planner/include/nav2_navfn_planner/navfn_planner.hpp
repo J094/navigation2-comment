@@ -187,6 +187,7 @@ protected:
    */
   bool isPlannerOutOfDate();
 
+  // 基于 ros1 NavFn 算法的规划器
   // Planner based on ROS1 NavFn algorithm
   std::unique_ptr<NavFn> planner_;
 
@@ -199,6 +200,7 @@ protected:
   // Logger
   rclcpp::Logger logger_{rclcpp::get_logger("NavfnPlanner")};
 
+  // 地图
   // Global Costmap
   nav2_costmap_2d::Costmap2D * costmap_;
 

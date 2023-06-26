@@ -85,6 +85,7 @@ PlannerServer::on_configure(const rclcpp_lifecycle::State & /*state*/)
   RCLCPP_INFO(get_logger(), "Configuring");
 
   // 配置 costmap_ros
+  // TODO: 貌似 Costmap2DROS 没有 configure 函数?
   costmap_ros_->configure();
   costmap_ = costmap_ros_->getCostmap();
 

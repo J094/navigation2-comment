@@ -110,7 +110,9 @@ create_nav_plan_astar(
 
 NavFn::NavFn(int xs, int ys)
 {
+  // xs 和 ys 为地图的 x y 尺寸
   // create cell arrays
+  // 初始化各种数组
   costarr = NULL;
   potarr = NULL;
   pending = NULL;
