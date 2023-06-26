@@ -48,6 +48,7 @@
 
 namespace nav2_costmap_2d
 {
+// 在障碍物膨胀的过程中保存 cell 数据
 /**
  * @class CellData
  * @brief Storage for cell information used during obstacle inflation
@@ -68,11 +69,15 @@ public:
   : index_(static_cast<unsigned int>(i)), x_(x), y_(y), src_x_(sx), src_y_(sy)
   {
   }
+  // costmap 中一维的 index
   unsigned int index_;
+  // costmap 中的坐标
   unsigned int x_, y_;
+  // costmap 中距离当前 cell 最近的障碍的坐标
   unsigned int src_x_, src_y_;
 };
 
+// 通过机器人的轮廓来卷积 costmap, 避免碰撞以及最大程度的碰撞检测
 /**
  * @class InflationLayer
  * @brief Layer to convolve costmap by robot's radius or footprint to prevent
@@ -149,13 +154,17 @@ public:
   {
     unsigned char cost = 0;
     if (distance == 0) {
+      // 距离为 0, 就是障碍物本身
       cost = LETHAL_OBSTACLE;
     } else if (distance * resolution_ <= inscribed_radius_) {
+      // 距离小于铭刻半径, 障碍非常接近了, 贴着
       cost = INSCRIBED_INFLATED_OBSTACLE;
     } else {
+      // 其他的就根据距离按照比例扩散出去, 距离越远越少
       // make sure cost falls off by Euclidean distance
       double factor =
         exp(-1.0 * cost_scaling_factor_ * (distance * resolution_ - inscribed_radius_));
+      // MAX_NON_OBSTACLE 就是 INSCRIBED_INFLATED_OBSTACLE - 1
       cost = static_cast<unsigned char>((INSCRIBED_INFLATED_OBSTACLE - 1) * factor);
     }
     return cost;
@@ -208,6 +217,7 @@ private:
     unsigned int mx, unsigned int my, unsigned int src_x,
     unsigned int src_y)
   {
+    // 计算距离, 获取 cost
     unsigned int dx = (mx > src_x) ? mx - src_x : src_x - mx;
     unsigned int dy = (my > src_y) ? my - src_y : src_y - my;
     return cached_costs_[dx * cache_length_ + dy];
@@ -249,6 +259,7 @@ private:
   bool inflate_unknown_, inflate_around_unknown_;
   unsigned int cell_inflation_radius_;
   unsigned int cached_cell_inflation_radius_;
+  // 层数 -> 该层的 cells
   std::vector<std::vector<CellData>> inflation_cells_;
 
   double resolution_;

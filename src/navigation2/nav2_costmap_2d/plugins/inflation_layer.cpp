@@ -68,11 +68,13 @@ InflationLayer::InflationLayer()
   cached_cell_inflation_radius_(0),
   resolution_(0),
   cache_length_(0),
+  // 初始化上界和下界
   last_min_x_(std::numeric_limits<double>::lowest()),
   last_min_y_(std::numeric_limits<double>::lowest()),
   last_max_x_(std::numeric_limits<double>::max()),
   last_max_y_(std::numeric_limits<double>::max())
 {
+  // 创建新的互斥锁
   access_ = new mutex_t();
 }
 
@@ -113,6 +115,7 @@ InflationLayer::onInitialize()
   cached_distances_.clear();
   cached_costs_.clear();
   need_reinflation_ = false;
+  // 计算地图上的膨胀半径
   cell_inflation_radius_ = cellDistance(inflation_radius_);
   matchSize();
 }
@@ -120,11 +123,18 @@ InflationLayer::onInitialize()
 void
 InflationLayer::matchSize()
 {
+  // 拿 costmap 的时候不希望被修改
   std::lock_guard<Costmap2D::mutex_t> guard(*getMutex());
+  // 拿到 costmap
   nav2_costmap_2d::Costmap2D * costmap = layered_costmap_->getCostmap();
+  // 获取分辨率 m/cell
   resolution_ = costmap->getResolution();
+  // 计算地图上的膨胀半径
+  // TODO: 在这之前会有重复计算?
   cell_inflation_radius_ = cellDistance(inflation_radius_);
+  // 计算缓存, 也就是计算了某个点周围膨胀的范围和值
   computeCaches();
+  // 表示是否遍历过了, 其 size 就是所有 cells
   seen_ = std::vector<bool>(costmap->getSizeInCellsX() * costmap->getSizeInCellsY(), false);
 }
 
@@ -140,6 +150,8 @@ InflationLayer::updateBounds(
     last_max_x_ = *max_x;
     last_max_y_ = *max_y;
 
+    // 如果重新膨胀, 这里 min 和 max 取下界和上界
+    // 这是为了保证任何位置都可以被膨胀影响, 后续更新 cost 的时候不会超出地图边界
     *min_x = std::numeric_limits<double>::lowest();
     *min_y = std::numeric_limits<double>::lowest();
     *max_x = std::numeric_limits<double>::max();
@@ -154,6 +166,8 @@ InflationLayer::updateBounds(
     last_min_y_ = *min_y;
     last_max_x_ = *max_x;
     last_max_y_ = *max_y;
+    // 如果不需要重新膨胀, 这里更新 min 和 max 考虑膨胀半径
+    // 因为膨胀过后只会比正常边界大膨胀半径, 所以只考虑膨胀半径即可
     *min_x = std::min(tmp_min_x, *min_x) - inflation_radius_;
     *min_y = std::min(tmp_min_y, *min_y) - inflation_radius_;
     *max_x = std::max(tmp_max_x, *max_x) + inflation_radius_;
@@ -165,9 +179,13 @@ void
 InflationLayer::onFootprintChanged()
 {
   std::lock_guard<Costmap2D::mutex_t> guard(*getMutex());
+  // TODO: 为什么要重新膨胀?
   inscribed_radius_ = layered_costmap_->getInscribedRadius();
+  // 获得膨胀半径
   cell_inflation_radius_ = cellDistance(inflation_radius_);
+  // 根据新的膨胀半径计算距离矩阵等
   computeCaches();
+  // 由于轮廓改变, 需要重新膨胀
   need_reinflation_ = true;
 
   RCLCPP_DEBUG(
@@ -194,15 +212,18 @@ InflationLayer::updateCosts(
       !dist.empty(), "The inflation list must be empty at the beginning of inflation");
   }
 
+  // 拿到 char * 的地图
   unsigned char * master_array = master_grid.getCharMap();
   unsigned int size_x = master_grid.getSizeInCellsX(), size_y = master_grid.getSizeInCellsY();
 
   if (seen_.size() != size_x * size_y) {
+    // 一定确保所有地图点都被考虑在 seen_ 中
     RCLCPP_WARN(
       logger_, "InflationLayer::updateCosts(): seen_ vector size is wrong");
     seen_ = std::vector<bool>(size_x * size_y, false);
   }
 
+  // 首先初始化, 所有地图坐标位置都是没处理过的
   std::fill(begin(seen_), end(seen_), false);
 
   // We need to include in the inflation cells outside the bounding
@@ -213,11 +234,13 @@ InflationLayer::updateCosts(
   const int base_min_j = min_j;
   const int base_max_i = max_i;
   const int base_max_j = max_j;
+  // 首先需要将地图扩张膨胀半径
   min_i -= static_cast<int>(cell_inflation_radius_);
   min_j -= static_cast<int>(cell_inflation_radius_);
   max_i += static_cast<int>(cell_inflation_radius_);
   max_j += static_cast<int>(cell_inflation_radius_);
 
+  // 不能超过地图边界
   min_i = std::max(0, min_i);
   min_j = std::max(0, min_j);
   max_i = std::min(static_cast<int>(size_x), max_i);
@@ -229,12 +252,16 @@ InflationLayer::updateCosts(
   // with a notable performance boost
 
   // Start with lethal obstacles: by definition distance is 0.0
+  // obs_bin 就是障碍物
   auto & obs_bin = inflation_cells_[0];
   for (int j = min_j; j < max_j; j++) {
     for (int i = min_i; i < max_i; i++) {
       int index = static_cast<int>(master_grid.getIndex(i, j));
+      // 遍历获取 bbox 更新区域的 cost
       unsigned char cost = master_array[index];
       if (cost == LETHAL_OBSTACLE || (inflate_around_unknown_ && cost == NO_INFORMATION)) {
+        // 只膨胀障碍物, 或者根据需求膨胀未知区域
+        // index 为障碍物 index, i j 为障碍物的地图坐标
         obs_bin.emplace_back(index, i, j, i, j);
       }
     }
@@ -243,6 +270,7 @@ InflationLayer::updateCosts(
   // Process cells by increasing distance; new cells are appended to the
   // corresponding distance bin, so they
   // can overtake previously inserted but farther away cells
+  // 一层一层处理 cost, 从低 level 到高 level
   for (const auto & dist_bin : inflation_cells_) {
     for (std::size_t i = 0; i < dist_bin.size(); ++i) {
       // Do not use iterator or for-range based loops to
@@ -252,6 +280,7 @@ InflationLayer::updateCosts(
 
       // ignore if already visited
       if (seen_[index]) {
+        // 如果已经处理过了就跳过
         continue;
       }
 
@@ -263,7 +292,9 @@ InflationLayer::updateCosts(
       unsigned int sy = dist_bin[i].src_y_;
 
       // assign the cost associated with the distance from an obstacle to the cell
+      // 根据当前点到基点的距离, 获取 cost
       unsigned char cost = costLookup(mx, my, sx, sy);
+      // 获取老的 cost
       unsigned char old_cost = master_array[index];
       // In order to avoid artifacts appeared out of boundary areas
       // when some layer is going after inflation_layer,
@@ -273,15 +304,19 @@ InflationLayer::updateCosts(
         static_cast<int>(mx) < base_max_i &&
         static_cast<int>(my) < base_max_j)
       {
+        // 当前点应该在地图内
         if (old_cost == NO_INFORMATION &&
           (inflate_unknown_ ? (cost > FREE_SPACE) : (cost >= INSCRIBED_INFLATED_OBSTACLE)))
         {
+          // 如果老的没信息, \新的满足要求, 直接覆盖
           master_array[index] = cost;
         } else {
+          // 如果已经有信息了, 取最大值
           master_array[index] = std::max(old_cost, cost);
         }
       }
 
+      // 然后将该点附近的点放入, 原点保持 sx sy 不变, 取上下左右四个点
       // attempt to put the neighbors of the current cell onto the inflation list
       if (mx > 0) {
         enqueue(index - 1, mx - 1, my, sx, sy);
@@ -295,14 +330,18 @@ InflationLayer::updateCosts(
       if (my < size_y - 1) {
         enqueue(index + size_x, mx, my + 1, sx, sy);
       }
+      // 相当于是一层一层向外扩, 从深向浅填充, 已访问的不再访问
+      // 而且这是相对于所有待扩张点来说的
     }
   }
 
   for (auto & dist : inflation_cells_) {
+    // 这里 cost 处理完了, 清空待扩张点
     dist.clear();
     dist.reserve(200);
   }
 
+  // 更新完了, 设置当前为最新
   current_ = true;
 }
 
@@ -321,6 +360,7 @@ InflationLayer::enqueue(
   unsigned int src_x, unsigned int src_y)
 {
   if (!seen_[index]) {
+    // 只处理没有处理过的
     // we compute our distance table one cell further than the
     // inflation radius dictates so we can make the check below
     double distance = distanceLookup(mx, my, src_x, src_y);
@@ -328,12 +368,14 @@ InflationLayer::enqueue(
     // we only want to put the cell in the list if it is within
     // the inflation radius of the obstacle point
     if (distance > cell_inflation_radius_) {
+      // 只处理在膨胀半径内的地图坐标
       return;
     }
 
     const unsigned int r = cell_inflation_radius_ + 2;
 
     // push the cell data onto the inflation list and mark
+    // 按照距离 level 加入
     inflation_cells_[distance_matrix_[mx - src_x + r][my - src_y + r]].emplace_back(
       index, mx, my, src_x, src_y);
   }
@@ -344,11 +386,14 @@ InflationLayer::computeCaches()
 {
   std::lock_guard<Costmap2D::mutex_t> guard(*getMutex());
   if (cell_inflation_radius_ == 0) {
+    // 如果膨胀半径为 0, 就是不膨胀
     return;
   }
 
+  // 缓存的长度, 会根据这个计算方框中所有像素到原点的距离
   cache_length_ = cell_inflation_radius_ + 2;
 
+  // 基于膨胀半径计算距离
   // based on the inflation radius... compute distance and cost caches
   if (cell_inflation_radius_ != cached_cell_inflation_radius_) {
     cached_costs_.resize(cache_length_ * cache_length_);
@@ -356,23 +401,30 @@ InflationLayer::computeCaches()
 
     for (unsigned int i = 0; i < cache_length_; ++i) {
       for (unsigned int j = 0; j < cache_length_; ++j) {
+        // 这里就是方框中素有像素到原点的距离
         cached_distances_[i * cache_length_ + j] = hypot(i, j);
       }
     }
 
+    // 这里标记距离计算过了
     cached_cell_inflation_radius_ = cell_inflation_radius_;
   }
 
   for (unsigned int i = 0; i < cache_length_; ++i) {
     for (unsigned int j = 0; j < cache_length_; ++j) {
+      // 根据距离计算花费
       cached_costs_[i * cache_length_ + j] = computeCost(cached_distances_[i * cache_length_ + j]);
     }
   }
 
+  // 获得最大的距离, 也是就最大 level, 最大的层数
   int max_dist = generateIntegerDistances();
+  // 先清空
   inflation_cells_.clear();
+  // 再 resize, 层数加 1 因为圆心算一个
   inflation_cells_.resize(max_dist + 1);
   for (auto & dist : inflation_cells_) {
+    // 每一层申请 200 的空间给 cells
     dist.reserve(200);
   }
 }
@@ -381,6 +433,7 @@ int
 InflationLayer::generateIntegerDistances()
 {
   const int r = cell_inflation_radius_ + 2;
+  // 2 * r + 1 就是这个圆的真正直径
   const int size = r * 2 + 1;
 
   std::vector<std::pair<int, int>> points;
@@ -388,11 +441,13 @@ InflationLayer::generateIntegerDistances()
   for (int y = -r; y <= r; y++) {
     for (int x = -r; x <= r; x++) {
       if (x * x + y * y <= r * r) {
+        // 基于某点为圆心的圆囊括的坐标点
         points.emplace_back(x, y);
       }
     }
   }
 
+  // 根据距离来排序, 升序从小到大
   std::sort(
     points.begin(), points.end(),
     [](const std::pair<int, int> & a, const std::pair<int, int> & b) -> bool {
@@ -407,12 +462,15 @@ InflationLayer::generateIntegerDistances()
     if (p.first * p.first + p.second * p.second !=
       last.first * last.first + last.second * last.second)
     {
+      // 只要距离不相等, 那么 level 需要加一, 相当于向外扩了一圈
       level++;
     }
+    // 然后基于左下角点为 0 0 点,  
     distance_matrix[p.first + r][p.second + r] = level;
     last = p;
   }
 
+  // 保存距离矩阵, 距离矩阵就是左下角为坐标原点, 所有坐标距离圆中心点的距离
   distance_matrix_ = distance_matrix;
   return level;
 }

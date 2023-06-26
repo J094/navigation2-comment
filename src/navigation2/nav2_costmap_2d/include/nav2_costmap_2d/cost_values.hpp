@@ -44,9 +44,9 @@ namespace nav2_costmap_2d
 static constexpr unsigned char NO_INFORMATION = 255;
 // 致命障碍
 static constexpr unsigned char LETHAL_OBSTACLE = 254;
-// 膨胀的障碍
+// 铭刻膨胀的障碍, 标志危险非常接近, 贴着
 static constexpr unsigned char INSCRIBED_INFLATED_OBSTACLE = 253;
-// 最大无障碍
+// 最大无障碍, 标志危险就在眼前, 还没到不过有风险
 static constexpr unsigned char MAX_NON_OBSTACLE = 252;
 // 自由区域
 static constexpr unsigned char FREE_SPACE = 0;
