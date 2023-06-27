@@ -281,7 +281,7 @@ NavfnPlanner::makePlan(
   // 给规划器设置起点和终点
   planner_->setStart(map_goal);
   planner_->setGoal(map_start);
-  // 根据需求实际规划路径
+  // 根据需求实际规划路径, 这里实际是计算了一个 potential 场
   if (use_astar_) {
     planner_->calcNavFnAstar();
   } else {
@@ -294,6 +294,8 @@ NavfnPlanner::makePlan(
   bool found_legal = false;
 
   p = goal;
+  // 获得了终点的 potential
+  // TODO: 终点的 potential 通常应该是 0?
   double potential = getPointPotential(p.position);
   if (potential < POT_HIGH) {
     // Goal is reachable by itself
@@ -325,6 +327,7 @@ NavfnPlanner::makePlan(
     // extract the plan
     // 这里获取规划的 plan
     if (getPlanFromPotential(best_pose, plan)) {
+      // 然后平滑 plan
       smoothApproachToGoal(best_pose, plan);
 
       // If use_final_approach_orientation=true, interpolate the last pose orientation from the
@@ -391,6 +394,7 @@ NavfnPlanner::getPlanFromPotential(
   const geometry_msgs::msg::Pose & goal,
   nav_msgs::msg::Path & plan)
 {
+  // 首先清空路径
   // clear the plan, just in case
   plan.poses.clear();
 
@@ -427,6 +431,7 @@ NavfnPlanner::getPlanFromPotential(
     logger_,
     "Path found, %d steps, %f cost\n", path_len, cost);
 
+  // 获取规划路径, 放入 plan 中
   // extract the plan
   float * x = planner_->getPathX();
   float * y = planner_->getPathY();

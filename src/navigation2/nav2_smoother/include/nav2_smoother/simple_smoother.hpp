@@ -36,6 +36,7 @@
 namespace nav2_smoother
 {
 
+// 简单的路径平滑器, 用于不可行的规划
 /**
  * @class nav2_smoother::SimpleSmoother
  * @brief A path smoother implementation

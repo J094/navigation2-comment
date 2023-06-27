@@ -119,15 +119,18 @@ NavFn::NavFn(int xs, int ys)
   gradx = grady = NULL;
   setNavArr(xs, ys);
 
+  // 优先级 buffers
   // priority buffers
   pb1 = new int[PRIORITYBUFSIZE];
   pb2 = new int[PRIORITYBUFSIZE];
   pb3 = new int[PRIORITYBUFSIZE];
 
+  // 不同算法不同设置
   // for Dijkstra (breadth-first), set to COST_NEUTRAL
   // for A* (best-first), set to COST_NEUTRAL
   priInc = 2 * COST_NEUTRAL;
 
+  // 终点和起点初始化
   // goal and start
   goal[0] = goal[1] = 0;
   start[0] = start[1] = 0;
@@ -136,6 +139,7 @@ NavFn::NavFn(int xs, int ys)
   // displayFn = NULL;
   // displayInt = 0;
 
+  // 路径的 buffers
   // path buffers
   npathbuf = npath = 0;
   pathx = pathy = NULL;
@@ -213,6 +217,7 @@ NavFn::setNavArr(int xs, int ys)
   ny = ys;
   ns = nx * ny;
 
+  // 重置这些数组
   if (costarr) {
     delete[] costarr;
   }
@@ -247,6 +252,7 @@ NavFn::setNavArr(int xs, int ys)
 void
 NavFn::setCostmap(const COSTTYPE * cmap, bool isROS, bool allow_unknown)
 {
+  // 对于 ros 的和非 ros 的地图不同操作
   COSTTYPE * cm = costarr;
   if (isROS) {  // ROS-type cost array
     for (int i = 0; i < ny; i++) {
@@ -256,15 +262,18 @@ NavFn::setCostmap(const COSTTYPE * cmap, bool isROS, bool allow_unknown)
         // COST_OBS                 -> COST_OBS (incoming "lethal obstacle")
         // COST_OBS_ROS             -> COST_OBS (incoming "inscribed inflated obstacle")
         // values in range 0 to 252 -> values from COST_NEUTRAL to COST_OBS_ROS.
+        // 开始给个致命障碍, 后续根据情况更新
         *cm = COST_OBS;
         int v = *cmap;
         if (v < COST_OBS_ROS) {
           v = COST_NEUTRAL + COST_FACTOR * v;
           if (v >= COST_OBS) {
+            // 其实就是 COST_OBS_ROS
             v = COST_OBS - 1;
           }
           *cm = v;
         } else if (v == COST_UNKNOWN_ROS && allow_unknown) {
+          // 如果 allow_unknown 表示 unknown 区域的 cost 小一点
           v = COST_OBS - 1;
           *cm = v;
         }
@@ -275,6 +284,7 @@ NavFn::setCostmap(const COSTTYPE * cmap, bool isROS, bool allow_unknown)
       int k = i * nx;
       for (int j = 0; j < nx; j++, k++, cmap++, cm++) {
         *cm = COST_OBS;
+        // TODO: 意义不明?
         if (i < 7 || i > ny - 8 || j < 7 || j > nx - 8) {
           continue;  // don't do borders
         }
@@ -297,8 +307,10 @@ NavFn::setCostmap(const COSTTYPE * cmap, bool isROS, bool allow_unknown)
 bool
 NavFn::calcNavFnDijkstra(bool atStart)
 {
+  // 配置
   setupNavFn(true);
 
+  // 计算路径
   // calculate the nav fn and path
   return propNavFnDijkstra(std::max(nx * ny / 20, nx + ny), atStart);
 }
@@ -311,8 +323,10 @@ NavFn::calcNavFnDijkstra(bool atStart)
 bool
 NavFn::calcNavFnAstar()
 {
+  // 配置
   setupNavFn(true);
 
+  // 计算路径
   // calculate the nav fn and path
   return propNavFnAstar(std::max(nx * ny / 20, nx + ny));
 }
@@ -326,12 +340,16 @@ float * NavFn::getPathY() {return pathy;}
 int NavFn::getPathLen() {return npath;}
 
 // inserting onto the priority blocks
+// n 必须在地图中, 然后 pending[n] 表示 n 没有访问过, 然后 n 处不是障碍物, 然后 curPe 不超过缓存尺寸
+// 就把 n 放入 curP 的 curPe 的位置, 然后 curPe++, 注意这里 curPe 初始为 0, 会不断累加
 #define push_cur(n)  {if (n >= 0 && n < ns && !pending[n] && \
       costarr[n] < COST_OBS && curPe < PRIORITYBUFSIZE) \
     {curP[curPe++] = n; pending[n] = true;}}
+// 同样的判断条件, 只不过会放入到 nextP 中, 但是同样会影响 pending[n]
 #define push_next(n) {if (n >= 0 && n < ns && !pending[n] && \
       costarr[n] < COST_OBS && nextPe < PRIORITYBUFSIZE) \
     {nextP[nextPe++] = n; pending[n] = true;}}
+// 同样, 放入 overP 中
 #define push_over(n) {if (n >= 0 && n < ns && !pending[n] && \
       costarr[n] < COST_OBS && overPe < PRIORITYBUFSIZE) \
     {overP[overPe++] = n; pending[n] = true;}}
@@ -342,15 +360,18 @@ int NavFn::getPathLen() {return npath;}
 void
 NavFn::setupNavFn(bool keepit)
 {
+  // 先重置数组
   // reset values in propagation arrays
   for (int i = 0; i < ns; i++) {
     potarr[i] = POT_HIGH;
     if (!keepit) {
+      // 如果不保留, 重置 costarr
       costarr[i] = COST_NEUTRAL;
     }
     gradx[i] = grady[i] = 0.0;
   }
 
+  // 这里是把地图边界一圈设置为 COST_OBS 禁止靠近
   // outer bounds of cost array
   COSTTYPE * pc;
   pc = costarr;
@@ -370,20 +391,29 @@ NavFn::setupNavFn(bool keepit)
     *pc = COST_OBS;
   }
 
+  // 优先级 buffers
   // priority buffers
+  // 当前阈值设为禁止区域 COST_OBS
   curT = COST_OBS;
+  // 当前为 pb1
   curP = pb1;
   curPe = 0;
+  // 下一个为 pb2
   nextP = pb2;
   nextPe = 0;
+  // overflow 的 block 为 pb3
   overP = pb3;
   overPe = 0;
+  // 先给 pending 全设置为 0
   memset(pending, 0, ns * sizeof(bool));
 
+  // 设置终点的 index = x + y * size_x
   // set goal
   int k = goal[0] + goal[1] * nx;
+  // 初始化终点的 potential 为 0
   initCost(k, 0);
 
+  // 寻找障碍物 cells, 计算数量
   // find # of obstacle cells
   pc = costarr;
   int ntot = 0;
@@ -401,6 +431,9 @@ NavFn::setupNavFn(bool keepit)
 void
 NavFn::initCost(int k, float v)
 {
+  // 这里设置 potential
+  // 然后把当前点的前后左右放进 curP 中
+  // 终点的话就是设置 potential 为 0
   potarr[k] = v;
   push_cur(k + 1);
   push_cur(k - 1);
@@ -492,11 +525,13 @@ NavFn::updateCell(int n)
 // No checking of bounds here, this function should be fast
 //
 
+// 这是根号二分之一
 #define INVSQRT2 0.707106781
 
 inline void
 NavFn::updateCellAstar(int n)
 {
+  // 先拿到该 cell 的四周 potential, 就是该点到终点的花费
   // get neighbors
   float u, d, l, r;
   l = potarr[n - 1];
@@ -509,26 +544,39 @@ NavFn::updateCellAstar(int n)
 
   // find lowest, and its lowest neighbor
   float ta, tc;
+  // tc 为左右中 potential 更小的那一个 cell
   if (l < r) {tc = l;} else {tc = r;}
+  // ta 为上下中 potential 更小的那一个 cell
   if (u < d) {ta = u;} else {ta = d;}
 
+  // planar-wave update 是从上下左右中最小的两个邻居计算
   // do planar wave update
   if (costarr[n] < COST_OBS) {  // don't propagate into obstacles
+    // 对于障碍物不考虑
+    // hf 拿到了当前 cell 的 cost
     float hf = static_cast<float>(costarr[n]);  // traversability factor
     float dc = tc - ta;  // relative cost between ta,tc
     if (dc < 0) {  // ta is lowest
+      // ta 应该是 ta tc 最小的那一个, dc 应该 > 0
       dc = -dc;
       ta = tc;
     }
 
+    // 这里计算 potential, 当前的 potential 应该是周围最小的 potential 加上当前的 cost
     // calculate new potential
     float pot;
     if (dc >= hf) {  // if too large, use ta-only update
+      // 这里如果 dc >= hf 表示最小的两个邻居 potential 差大于当前位置的 cost, 差值足够大
+      // 直接采用 ta 的 potential 计算当前 cell 的 potential
       pot = ta + hf;
     } else {  // two-neighbor interpolation update
       // use quadratic approximation
       // might speed this up through table lookup, but still have to
       //   do the divide
+      // 如果最小的和第二小的两个邻居差距没有足够大
+      // 二阶近似插值, 四个点, 两个最小 potential 的点差值是 dc, 还存在一个点距离当前点的差值为 hf
+      // 通过二阶插值公式获得当前点的 potential, 存在的那个点应该在 ta 一下的某个位置
+      // 提供更加连续平滑的 potential
       float d = dc / hf;
       float v = -0.2301 * d * d + 0.5307 * d + 0.7040;
       pot = ta + hf * v;
@@ -536,26 +584,37 @@ NavFn::updateCellAstar(int n)
 
     // ROS_INFO("[Update] new pot: %d\n", costarr[n]);
 
+    // 当前位置的 potential 改变了, 又会影响四周的 potential
+    // 添加受影响的邻居到优先级 blocks
     // now add affected neighbors to priority blocks
     if (pot < potarr[n]) {
+      // 如果当前新计算的 potential 小于之前的
+      // 获取上下左右四个邻居的 cost
+      // TODO: 为什么这里除以根号二?
       float le = INVSQRT2 * static_cast<float>(costarr[n - 1]);
       float re = INVSQRT2 * static_cast<float>(costarr[n + 1]);
       float ue = INVSQRT2 * static_cast<float>(costarr[n - nx]);
       float de = INVSQRT2 * static_cast<float>(costarr[n + nx]);
 
+      // 计算当前位置的 x y, 然后计算地图距离
       // calculate distance
       int x = n % nx;
       int y = n / nx;
       float dist = hypot(x - start[0], y - start[1]) * static_cast<float>(COST_NEUTRAL);
 
+      // 当前位置的 potential 为 pot
       potarr[n] = pot;
+      // 加上距离表示起点到当前位置的预估花费, pot 为实际花费
       pot += dist;
       if (pot < curT) {  // low-cost buffer block
+        // 如果 pot 小于当前阈值, 放入 next 优先级 block 中, 下一个循环会检查这些
+        // 加入的前提是当前计算的 pot + 当前 cost 要小于之前的 potential
         if (l > pot + le) {push_next(n - 1);}
         if (r > pot + re) {push_next(n + 1);}
         if (u > pot + ue) {push_next(n - nx);}
         if (d > pot + de) {push_next(n + nx);}
       } else {
+        // 否则放入 overflow 的优先级 block 中
         if (l > pot + le) {push_over(n - 1);}
         if (r > pot + re) {push_over(n + 1);}
         if (u > pot + ue) {push_over(n - nx);}
@@ -659,46 +718,63 @@ bool
 NavFn::propNavFnAstar(int cycles)
 {
   int nwv = 0;  // max priority block size
+  // 放入优先级 buffer 的数量
   int nc = 0;  // number of cells put into priority blocks
   int cycle = 0;  // which cycle we're on
 
+  // 基于距离设置初始的阈值
   // set initial threshold, based on distance
   float dist = hypot(goal[0] - start[0], goal[1] - start[1]) * static_cast<float>(COST_NEUTRAL);
+  // 这里阈值被放大, 应该是从终点开始, 然后加上预估起点到终点的花费
   curT = dist + curT;
 
+  // 设置开始 cell 的 index = x + y * size_x
   // set up start cell
   int startCell = start[1] * nx + start[0];
 
+  // 主要循环
   // do main cycle
   for (; cycle < cycles; cycle++) {  // go for this many cycles, unless interrupted
     if (curPe == 0 && nextPe == 0) {  // priority blocks empty
+      // 这里如果所有指正都是 0, 表示优先级 arr 中没有 cell
       break;
     }
 
+    // 统计
     // stats
+    // 这一轮累计 curPe 个 cells
+    // 如果是第一轮, 也就是终点附近的四个邻居
     nc += curPe;
     if (curPe > nwv) {
+      // 如果找到了最大的优先级 buffer 的 size, 记录下来
       nwv = curPe;
     }
 
+    // 在当前的优先级 buffer 中重置 pending
     // reset pending flags on current priority buffer
     int * pb = curP;
     int i = curPe;
     while (i-- > 0) {
+      // 这里 *pb 就是获取 index
       pending[*(pb++)] = false;
     }
 
+    // 处理当前的优先级 buffer
     // process current priority buffer
     pb = curP;
     i = curPe;
     while (i-- > 0) {
+      // 当前优先级 buffer 中的所有 cell
+      // 第一轮就是更新终点附近的四个邻居的 cell
       updateCellAstar(*pb++);
     }
+    // 更新完所有 cells 之后, nextP 和 overP 中会有一些新添加的 cell
 
     // if (displayInt > 0 && (cycle % displayInt) == 0) {
     //   displayFn(this);
     // }
 
+    // curP 处理完了, 和 nextP 互换, 下一轮继续
     // swap priority blocks curP <=> nextP
     curPe = nextPe;
     nextPe = 0;
@@ -718,10 +794,12 @@ NavFn::propNavFnAstar(int cycles)
 
     // check if we've hit the Start cell
     if (potarr[startCell] < POT_HIGH) {
+      // 检查如果已经找到了开始的 cell, 退出
       break;
     }
   }
 
+  // 最终获得路径的花费
   last_path_cost_ = potarr[startCell];
 
   RCLCPP_DEBUG(
@@ -732,6 +810,7 @@ NavFn::propNavFnAstar(int cycles)
   if (potarr[startCell] < POT_HIGH) {
     return true;  // finished up here}
   } else {
+    // 如果经过了这么多轮, 还是没有找到开始点, 那么路径规划失败
     return false;
   }
 }

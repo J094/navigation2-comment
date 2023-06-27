@@ -26,7 +26,7 @@
 namespace nav2_core
 {
 
-// 一个关于行为的抽象接口
+// 一个关于行为的抽象接口, 实现自己的行为需要继承这个类
 /**
  * @class Behavior
  * @brief Abstract interface for behaviors to adhere to with pluginlib

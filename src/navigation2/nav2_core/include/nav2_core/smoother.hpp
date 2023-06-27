@@ -31,6 +31,7 @@
 namespace nav2_core
 {
 
+// 平滑路径的插件, 自己实现需要继承这个类
 /**
  * @class Smoother
  * @brief smoother interface that acts as a virtual base class for all smoother plugins

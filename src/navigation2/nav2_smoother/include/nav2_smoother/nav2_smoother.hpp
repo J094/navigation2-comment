@@ -37,6 +37,7 @@
 namespace nav2_smoother
 {
 
+// 用来平滑和细化路径
 /**
  * @class nav2_smoother::SmootherServer
  * @brief This class hosts variety of plugins of different algorithms to

@@ -118,8 +118,10 @@ public:
    * @param ny The y size of the map
    */
   void setNavArr(int nx, int ny);
+  // 地图的尺寸, ns 是面积
   int nx, ny, ns;  /**< size of grid, in pixels */
 
+  // 设置 cost 数组, 这样 planner 可以根据 cost 数组规划出路径
   /**
    * @brief  Set up the cost array for the planner, usually from ROS
    * @param cmap The costmap
@@ -129,12 +131,14 @@ public:
    */
   void setCostmap(const COSTTYPE * cmap, bool isROS = true, bool allow_unknown = true);
 
+  // 使用 A* heuristic 来进行路径规划
   /**
    * @brief  Calculates a plan using the A* heuristic, returns true if one is found
    * @return True if a plan is found, false otherwise
    */
   bool calcNavFnAstar();
 
+  // 使用 Dijkstra 来进行规划
   /**
    * @brief Caclulates the full navigation function using Dijkstra
    */
@@ -164,6 +168,10 @@ public:
    */
   float getLastPathCost();
 
+  // cell arrays 应该代表每一个 cell 中的东西
+  // 如 costarr 就是每一个 cell 的 cost
+  // 如 potarr 就是每一个 cell 的 potential
+  // 如 pending 就是每一个 cell 是否在 pending 状态
   /** cell arrays */
   COSTTYPE * costarr;  /**< cost array in 2D configuration space */
   float * potarr;  /**< potential array, navigation function potential */
@@ -196,6 +204,7 @@ public:
    */
   void setStart(int * start);
 
+  // 保存终点和起点
   int goal[2];
   int start[2];
   /**
@@ -219,6 +228,7 @@ public:
    */
   void updateCellAstar(int n);
 
+  // 设置导航 potential arrays, 最终使用这个来规划路径
   /**
    * @brief  Set up navigation potential arrays for new propagation
    * @param keepit whether or not use COST_NEUTRAL

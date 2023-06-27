@@ -53,6 +53,7 @@
 namespace nav2_core
 {
 
+// 控制器的插件抽象类, 实现自己的控制器需要继承这个类
 /**
  * @class Controller
  * @brief controller interface that acts as a virtual base class for all controller plugins
