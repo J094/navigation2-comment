@@ -28,10 +28,12 @@ from launch_ros.actions import Node
 
 def generate_launch_description():
     # Get the launch directory
+    # 获取 bringup 包的文件夹, 然后找到 launch 的文件夹
     bringup_dir = get_package_share_directory('nav2_bringup')
     launch_dir = os.path.join(bringup_dir, 'launch')
 
     # Create the launch configuration variables
+    # 创建一些 launch 用到的配置变量
     slam = LaunchConfiguration('slam')
     namespace = LaunchConfiguration('namespace')
     use_namespace = LaunchConfiguration('use_namespace')
@@ -43,6 +45,7 @@ def generate_launch_description():
     use_respawn = LaunchConfiguration('use_respawn')
 
     # Launch configuration variables specific to simulation
+    # 针对于模拟场景的 launch 配置变量
     rviz_config_file = LaunchConfiguration('rviz_config_file')
     use_simulator = LaunchConfiguration('use_simulator')
     use_robot_state_pub = LaunchConfiguration('use_robot_state_pub')
