@@ -30,6 +30,7 @@ def generate_launch_description():
     # Get the launch directory
     bringup_dir = get_package_share_directory('nav2_bringup')
 
+    # 创建参数引用
     namespace = LaunchConfiguration('namespace')
     map_yaml_file = LaunchConfiguration('map')
     use_sim_time = LaunchConfiguration('use_sim_time')
@@ -41,6 +42,7 @@ def generate_launch_description():
     use_respawn = LaunchConfiguration('use_respawn')
     log_level = LaunchConfiguration('log_level')
 
+    # 定位模块有两个需要生命周期管理的节点
     lifecycle_nodes = ['map_server', 'amcl']
 
     # Map fully qualified names to relative ones so the node's namespace can be prepended.
@@ -57,15 +59,18 @@ def generate_launch_description():
         'use_sim_time': use_sim_time,
         'yaml_filename': map_yaml_file}
 
+    # 生成临时配置文件
     configured_params = RewrittenYaml(
         source_file=params_file,
         root_key=namespace,
         param_rewrites=param_substitutions,
         convert_types=True)
 
+    # 设置环境变量
     stdout_linebuf_envvar = SetEnvironmentVariable(
         'RCUTILS_LOGGING_BUFFERED_STREAM', '1')
 
+    # 声明参数
     declare_namespace_cmd = DeclareLaunchArgument(
         'namespace',
         default_value='',
@@ -105,6 +110,8 @@ def generate_launch_description():
         'log_level', default_value='info',
         description='log level')
 
+    # 创建动作组
+    # 只有不使用组启动才使用这个动作组
     load_nodes = GroupAction(
         condition=IfCondition(PythonExpression(['not ', use_composition])),
         actions=[
@@ -140,6 +147,7 @@ def generate_launch_description():
         ]
     )
 
+    # 如果使用组, 则设置容器, 并将 Node 改成 ComposableNode 放到 composable_node_descriptions 中
     load_composable_nodes = LoadComposableNodes(
         condition=IfCondition(use_composition),
         target_container=container_name_full,
@@ -169,9 +177,11 @@ def generate_launch_description():
     # Create the launch description and populate
     ld = LaunchDescription()
 
+    # 先设置环境变量
     # Set environment variables
     ld.add_action(stdout_linebuf_envvar)
 
+    # 声明参数
     # Declare the launch options
     ld.add_action(declare_namespace_cmd)
     ld.add_action(declare_map_yaml_cmd)
@@ -183,6 +193,7 @@ def generate_launch_description():
     ld.add_action(declare_use_respawn_cmd)
     ld.add_action(declare_log_level_cmd)
 
+    # 添加动作组
     # Add the actions to launch all of the localiztion nodes
     ld.add_action(load_nodes)
     ld.add_action(load_composable_nodes)

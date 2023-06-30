@@ -47,6 +47,7 @@ def generate_launch_description():
         default_value='false',
         description='Whether to apply a namespace to the navigation stack')
 
+    # rviz 配置文件默认为 {bringup_dir}/rviz/nav2_default_view.rviz
     declare_rviz_config_file_cmd = DeclareLaunchArgument(
         'rviz_config',
         default_value=os.path.join(bringup_dir, 'rviz', 'nav2_default_view.rviz'),
@@ -60,6 +61,7 @@ def generate_launch_description():
         arguments=['-d', rviz_config_file],
         output='screen')
 
+    # 更换 rviz 配置文件中的参数
     namespaced_rviz_config_file = ReplaceString(
             source_file=rviz_config_file,
             replacements={'<robot_namespace>': ('/', namespace)})

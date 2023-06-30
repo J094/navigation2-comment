@@ -28,10 +28,12 @@ from nav2_common.launch import RewrittenYaml
 
 
 def generate_launch_description():
+    # 先获取路径
     # Get the launch directory
     bringup_dir = get_package_share_directory('nav2_bringup')
     launch_dir = os.path.join(bringup_dir, 'launch')
 
+    # 然后确定要哪些参数, 创建这些参数的引用
     # Create the launch configuration variables
     namespace = LaunchConfiguration('namespace')
     use_namespace = LaunchConfiguration('use_namespace')
@@ -58,15 +60,20 @@ def generate_launch_description():
         'use_sim_time': use_sim_time,
         'yaml_filename': map_yaml_file}
 
+    # 该函数重写 yaml 配置文件
+    # 找到源 yaml 文件相同的 key, 然后用新的值来替换, 生成临时的 yaml 文件
     configured_params = RewrittenYaml(
         source_file=params_file,
         root_key=namespace,
         param_rewrites=param_substitutions,
         convert_types=True)
 
+    # 这是设置环境变量
+    # 这里吧 RCUTILS_LOGGING_BUFFERED_STREAM 设置为 1
     stdout_linebuf_envvar = SetEnvironmentVariable(
         'RCUTILS_LOGGING_BUFFERED_STREAM', '1')
 
+    # 这里开始声明这一些要用的启动配置参数, 声明了可以不引用, 要引用的话必须声明
     declare_namespace_cmd = DeclareLaunchArgument(
         'namespace',
         default_value='',
@@ -112,12 +119,16 @@ def generate_launch_description():
         'log_level', default_value='info',
         description='log level')
 
+    # 将动作打包成一个 group, 在后续添加动作的时候可以只添加这一个即可
     # Specify the actions
     bringup_cmd_group = GroupAction([
+        # 专门用来给命名空间的
         PushRosNamespace(
             condition=IfCondition(use_namespace),
             namespace=namespace),
 
+        # 运行节点, 这里运行的是组件功能节点
+        # 在 parameters 中额外加了 autostart
         Node(
             condition=IfCondition(use_composition),
             name='nav2_container',
@@ -128,6 +139,9 @@ def generate_launch_description():
             remappings=remappings,
             output='screen'),
 
+        # launch 文件包含
+        # slam 功能相关
+        # 这里只有 slam 为 true 才会开启
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(os.path.join(launch_dir, 'slam_launch.py')),
             condition=IfCondition(slam),
@@ -137,6 +151,8 @@ def generate_launch_description():
                               'use_respawn': use_respawn,
                               'params_file': params_file}.items()),
 
+        # 定位功能相关
+        # 没有 slam 就看开启定位模式, 因为 slam 也是提供位置的
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(os.path.join(launch_dir,
                                                        'localization_launch.py')),
@@ -150,6 +166,8 @@ def generate_launch_description():
                               'use_respawn': use_respawn,
                               'container_name': 'nav2_container'}.items()),
 
+        # 导航功能相关
+        # 这就是 navigation2 的主要功能, 根据定位和地图提供导航
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(os.path.join(launch_dir, 'navigation_launch.py')),
             launch_arguments={'namespace': namespace,
@@ -161,12 +179,15 @@ def generate_launch_description():
                               'container_name': 'nav2_container'}.items()),
     ])
 
+    # 创建 launch description, 将上面定义的东西放入
     # Create the launch description and populate
     ld = LaunchDescription()
 
+    # 优先设置环境变量
     # Set environment variables
     ld.add_action(stdout_linebuf_envvar)
 
+    # 声明参数
     # Declare the launch options
     ld.add_action(declare_namespace_cmd)
     ld.add_action(declare_use_namespace_cmd)
@@ -179,6 +200,7 @@ def generate_launch_description():
     ld.add_action(declare_use_respawn_cmd)
     ld.add_action(declare_log_level_cmd)
 
+    # 运行 action
     # Add the actions to launch all of the navigation nodes
     ld.add_action(bringup_cmd_group)
 

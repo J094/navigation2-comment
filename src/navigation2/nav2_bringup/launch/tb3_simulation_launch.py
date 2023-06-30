@@ -108,7 +108,7 @@ def generate_launch_description():
                   ('/tf_static', 'tf_static')]
 
     # 上面使用 LaunchConfiguration 引用一系列启动配置参数
-    # 下面使用 DeclareLaunchArgument 来什么这一系列启动配置参数
+    # 下面使用 DeclareLaunchArgument 来声明这一系列启动配置参数
     # 这种分离的设计方式提供了更好的灵活性和可配置性
     # 通常使用 DeclareLaunchArgument 来声明启动参数
     # 然后再需要的地方使用 LaunchConfiguration 来引用参数值

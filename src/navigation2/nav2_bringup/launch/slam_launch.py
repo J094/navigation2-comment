@@ -26,6 +26,7 @@ from nav2_common.launch import HasNodeParams, RewrittenYaml
 
 
 def generate_launch_description():
+    # 获取声明参数的引用
     # Input parameters declaration
     namespace = LaunchConfiguration('namespace')
     params_file = LaunchConfiguration('params_file')
@@ -34,12 +35,16 @@ def generate_launch_description():
     use_respawn = LaunchConfiguration('use_respawn')
     log_level = LaunchConfiguration('log_level')
 
+    # 表明了有哪些 lifecycle 节点
     # Variables
     lifecycle_nodes = ['map_saver']
 
+    # 获取文件夹
     # Getting directories and launch-files
     bringup_dir = get_package_share_directory('nav2_bringup')
+    # 要用到 slam_toolbox
     slam_toolbox_dir = get_package_share_directory('slam_toolbox')
+    # 会用到 online_sync_launch.py 这个文件
     slam_launch_file = os.path.join(slam_toolbox_dir, 'launch', 'online_sync_launch.py')
 
     # Create our own temporary YAML files that include substitutions
@@ -82,6 +87,7 @@ def generate_launch_description():
 
     # Nodes launching commands
 
+    # 地图保存服务节点
     start_map_saver_server_cmd = Node(
             package='nav2_map_server',
             executable='map_saver_server',
@@ -91,6 +97,7 @@ def generate_launch_description():
             arguments=['--ros-args', '--log-level', log_level],
             parameters=[configured_params])
 
+    # 用 lifecycle_manager 来管理地图保存节点
     start_lifecycle_manager_cmd = Node(
             package='nav2_lifecycle_manager',
             executable='lifecycle_manager',
@@ -104,14 +111,17 @@ def generate_launch_description():
     # If the provided param file doesn't have slam_toolbox params, we must remove the 'params_file'
     # LaunchConfiguration, or it will be passed automatically to slam_toolbox and will not load
     # the default file
+    # 检查是否有 slam_toolbox 节点的参数
     has_slam_toolbox_params = HasNodeParams(source_file=params_file,
                                             node_name='slam_toolbox')
 
+    # launch slam_toolbox 的命令, 这里如果没有参数, 采用默认参数
     start_slam_toolbox_cmd = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(slam_launch_file),
         launch_arguments={'use_sim_time': use_sim_time}.items(),
         condition=UnlessCondition(has_slam_toolbox_params))
 
+    # 如果参数文件中有 slam_toolbox 参数, 则采用该参数
     start_slam_toolbox_cmd_with_params = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(slam_launch_file),
         launch_arguments={'use_sim_time': use_sim_time,
@@ -120,6 +130,7 @@ def generate_launch_description():
 
     ld = LaunchDescription()
 
+    # 声明参数
     # Declare the launch options
     ld.add_action(declare_namespace_cmd)
     ld.add_action(declare_params_file_cmd)
@@ -128,10 +139,12 @@ def generate_launch_description():
     ld.add_action(declare_use_respawn_cmd)
     ld.add_action(declare_log_level_cmd)
 
+    # 开启地图保存服务
     # Running Map Saver Server
     ld.add_action(start_map_saver_server_cmd)
     ld.add_action(start_lifecycle_manager_cmd)
 
+    # 运行 slam_toolbox
     # Running SLAM Toolbox (Only one of them will be run)
     ld.add_action(start_slam_toolbox_cmd)
     ld.add_action(start_slam_toolbox_cmd_with_params)

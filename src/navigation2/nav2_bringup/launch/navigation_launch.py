@@ -30,6 +30,7 @@ def generate_launch_description():
     # Get the launch directory
     bringup_dir = get_package_share_directory('nav2_bringup')
 
+    # 创建参数引用
     namespace = LaunchConfiguration('namespace')
     use_sim_time = LaunchConfiguration('use_sim_time')
     autostart = LaunchConfiguration('autostart')
@@ -40,6 +41,7 @@ def generate_launch_description():
     use_respawn = LaunchConfiguration('use_respawn')
     log_level = LaunchConfiguration('log_level')
 
+    # 导航模块需要如下 7 个节点进行生命周期管理
     lifecycle_nodes = ['controller_server',
                        'smoother_server',
                        'planner_server',
@@ -68,9 +70,11 @@ def generate_launch_description():
             param_rewrites=param_substitutions,
             convert_types=True)
 
+    # 设置环境变量
     stdout_linebuf_envvar = SetEnvironmentVariable(
         'RCUTILS_LOGGING_BUFFERED_STREAM', '1')
 
+    # 声明参数
     declare_namespace_cmd = DeclareLaunchArgument(
         'namespace',
         default_value='',
@@ -106,6 +110,8 @@ def generate_launch_description():
         'log_level', default_value='info',
         description='log level')
 
+    # 创建动作组
+    # 分使用组合启动和不使用组合启动两个动作组
     load_nodes = GroupAction(
         condition=IfCondition(PythonExpression(['not ', use_composition])),
         actions=[
