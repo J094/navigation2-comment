@@ -39,6 +39,7 @@
 namespace nav2_collision_monitor
 {
 
+// 给机器人提供额外的安全
 /**
  * @brief Collision Monitor ROS2 node
  */

@@ -48,6 +48,7 @@
 
 namespace nav2_costmap_2d
 {
+// 读取到 speed restriction mask 的区域, 根据机器人的位置动态调整机器人的速度
 /**
  * @class SpeedFilter
  * @brief Reads in a speed restriction mask and enables a robot to

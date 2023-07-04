@@ -64,6 +64,7 @@ WaypointFollower::on_configure(const rclcpp_lifecycle::State & /*state*/)
     false);
   callback_group_executor_.add_callback_group(callback_group_, get_node_base_interface());
 
+  // 这里的客户端请求启用 navigator_to_pose 的导航器
   nav_to_pose_client_ = rclcpp_action::create_client<ClientT>(
     get_node_base_interface(),
     get_node_graph_interface(),
@@ -71,6 +72,7 @@ WaypointFollower::on_configure(const rclcpp_lifecycle::State & /*state*/)
     get_node_waitables_interface(),
     "navigate_to_pose", callback_group_);
 
+  // 这里起服务接受 follow_waypoints 的请求
   action_server_ = std::make_unique<ActionServer>(
     get_node_base_interface(),
     get_node_clock_interface(),

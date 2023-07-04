@@ -25,6 +25,7 @@
 
 namespace nav2_core
 {
+// 到达 waypoint 之后执行特定任务的插件
 /**
  * @brief Base class for creating a plugin in order to perform a specific task at waypoint arrivals.
  *

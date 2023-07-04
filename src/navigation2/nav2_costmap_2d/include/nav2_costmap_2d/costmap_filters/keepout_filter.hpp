@@ -49,6 +49,7 @@
 namespace nav2_costmap_2d
 {
 
+// 读取 keepout mask 的区域, 防止规划控制到该区域
 /**
  * @class KeepoutFilter
  * @brief Reads in a keepout mask and marks keepout regions in the map

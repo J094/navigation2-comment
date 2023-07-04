@@ -29,6 +29,7 @@
 namespace nav2_velocity_smoother
 {
 
+// 平滑 cmd_vel 提供给机器人
 /**
  * @class nav2_velocity_smoother::VelocitySmoother
  * @brief This class that smooths cmd_vel velocities for robot bases
