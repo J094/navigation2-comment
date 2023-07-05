@@ -45,6 +45,7 @@
 namespace nav2_costmap_2d
 {
 
+// costmap plugin layer 的基类, 继承这个类实现 costmap plugin
 /**
  * @class CostmapLayer
  * @brief A costmap layer base class for costmap plugin layers.

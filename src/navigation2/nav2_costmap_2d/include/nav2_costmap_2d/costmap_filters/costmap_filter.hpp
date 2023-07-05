@@ -49,6 +49,7 @@
 namespace nav2_costmap_2d
 {
 
+// costmap filter 的基类, 继承 Layer 避免一些隐藏的问题
 /**
  * @brief: CostmapFilter basic class. It is inherited from Layer in order to avoid
  * hidden problems when the shared handling of costmap_ resource (PR #1936)
