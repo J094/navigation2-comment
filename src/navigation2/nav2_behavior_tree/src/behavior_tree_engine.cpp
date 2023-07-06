@@ -80,7 +80,7 @@ BehaviorTreeEngine::createTreeFromText(
   const std::string & xml_string,
   BT::Blackboard::Ptr blackboard)
 {
-  // 根据 xml_string 来构建 树, 要给黑板
+  // 根据 xml_string 来构建树, 要给黑板
   return factory_.createTreeFromText(xml_string, blackboard);
 }
 
