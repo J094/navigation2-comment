@@ -396,13 +396,19 @@ NavFn::setupNavFn(bool keepit)
   // 当前阈值设为禁止区域 COST_OBS
   curT = COST_OBS;
   // 当前为 pb1
+  // 用于当前传播过程的索引数组
   curP = pb1;
+  // 数量
   curPe = 0;
   // 下一个为 pb2
+  // 用于下一个传播过程的索引数组
   nextP = pb2;
+  // 数量
   nextPe = 0;
   // overflow 的 block 为 pb3
+  // 传播阈值之外的索引数组
   overP = pb3;
+  // 数量
   overPe = 0;
   // 先给 pending 全设置为 0
   memset(pending, 0, ns * sizeof(bool));
@@ -591,6 +597,7 @@ NavFn::updateCellAstar(int n)
       // 如果当前新计算的 potential 小于之前的
       // 获取上下左右四个邻居的 cost
       // TODO: 为什么这里除以根号二?
+      // 这里默认斜对角才是正常 cost 花费, 所以上下左右都是除以根号二来归一化
       float le = INVSQRT2 * static_cast<float>(costarr[n - 1]);
       float re = INVSQRT2 * static_cast<float>(costarr[n + 1]);
       float ue = INVSQRT2 * static_cast<float>(costarr[n - nx]);
@@ -795,6 +802,7 @@ NavFn::propNavFnAstar(int cycles)
     // check if we've hit the Start cell
     if (potarr[startCell] < POT_HIGH) {
       // 检查如果已经找到了开始的 cell, 退出
+      // 这里是起点的 potential 被更新了, 就代表它被找到了
       break;
     }
   }
@@ -839,6 +847,7 @@ NavFn::calcPath(int n, int * st)
   // test write
   // savemap("test");
 
+  // 首先重置路径
   // check path arrays
   if (npathbuf < n) {
     if (pathx) {delete[] pathx;}
@@ -848,6 +857,7 @@ NavFn::calcPath(int n, int * st)
     npathbuf = n;
   }
 
+  // 设置起点
   // set up start position at cell
   // st is always upper left corner for 4-point bilinear interpolation
   if (st == NULL) {st = start;}
@@ -861,27 +871,34 @@ NavFn::calcPath(int n, int * st)
   // go for <n> cycles at most
   for (int i = 0; i < n; i++) {
     // check if near goal
+    // 这里是从 stc 走到 dx dy 开外的点位置就是 nearest_point
     int nearest_point = std::max(
       0,
       std::min(
         nx * ny - 1, stc + static_cast<int>(round(dx)) +
         static_cast<int>(nx * round(dy))));
+    // 如果这个点的 cost 小于 cost_neutral, 那么代表到达终点了
+    // 终点的 potential 为 0
     if (potarr[nearest_point] < COST_NEUTRAL) {
       pathx[npath] = static_cast<float>(goal[0]);
       pathy[npath] = static_cast<float>(goal[1]);
       return ++npath;  // done!
     }
 
+    // 检查是否出界 stc 不应该大于 ns - nx
+    // stc 也不应该小于 nx, 因为边界都设置为了障碍物区域, 不应该是起点位置
     if (stc < nx || stc > ns - nx) {  // would be out of bounds
       RCLCPP_DEBUG(rclcpp::get_logger("rclcpp"), "[PathCalc] Out of bounds");
       return 0;
     }
 
+    // 开始增加路径
     // add to path
     pathx[npath] = stc % nx + dx;
     pathy[npath] = stc / nx + dy;
     npath++;
 
+    // 检查是否震荡, 也就是回到了之前到过的某一点
     bool oscillation_detected = false;
     if (npath > 2 &&
       pathx[npath - 1] == pathx[npath - 3] &&
@@ -893,9 +910,11 @@ NavFn::calcPath(int n, int * st)
       oscillation_detected = true;
     }
 
+    // 上下两点
     int stcnx = stc + nx;
     int stcpx = stc - nx;
 
+    // 检查周围 8 个点的 potential
     // check for potentials at eight positions near cell
     if (potarr[stc] >= POT_HIGH ||
       potarr[stc + 1] >= POT_HIGH ||
@@ -912,6 +931,7 @@ NavFn::calcPath(int n, int * st)
         rclcpp::get_logger("rclcpp"),
         "[Path] Pot fn boundary, following grid (%0.1f/%d)", potarr[stc], npath);
 
+      // 这里找到周围最小的 potential, 并把起点设置为最小的点
       // check eight neighbors to find the lowest
       int minc = stc;
       int minp = potarr[stc];
@@ -939,13 +959,16 @@ NavFn::calcPath(int n, int * st)
         rclcpp::get_logger("rclcpp"), "[Path] Pot: %0.1f  pos: %0.1f,%0.1f",
         potarr[stc], pathx[npath - 1], pathy[npath - 1]);
 
+      // 检查这一点是否合理, 如果这一点还是没有到达的点, 那么找不到路径了
       if (potarr[stc] >= POT_HIGH) {
         RCLCPP_DEBUG(rclcpp::get_logger("rclcpp"), "[PathCalc] No path found, high potential");
         // savemap("navfn_highpot");
         return 0;
       }
     } else {  // have a good gradient here
+      // 这种情况是周围的梯度都没问题
       // get grad at four positions near cell
+      // 计算周围四个位置的梯度, 因为周围 8 个点, 只能得到中间四个交点的梯度
       gradCell(stc);
       gradCell(stc + 1);
       gradCell(stcnx);
@@ -953,6 +976,7 @@ NavFn::calcPath(int n, int * st)
 
 
       // get interpolated gradient
+      // 得到带 dx dy 偏移的梯度
       float x1 = (1.0 - dx) * gradx[stc] + dx * gradx[stc + 1];
       float x2 = (1.0 - dx) * gradx[stcnx] + dx * gradx[stcnx + 1];
       float x = (1.0 - dy) * x1 + dy * x2;  // interpolated x
@@ -977,11 +1001,13 @@ NavFn::calcPath(int n, int * st)
       }
 
       // move in the right direction
+      // 沿着梯度方向移动
       float ss = pathStep / hypot(x, y);
       dx += x * ss;
       dy += y * ss;
 
       // check for overflow
+      // 检查 dx 和 dy, 适当移动 stc 来保证 dx 和 dy 在 -1 ~ 1 之间
       if (dx > 1.0) {stc++; dx -= 1.0;}
       if (dx < -1.0) {stc--; dx += 1.0;}
       if (dy > 1.0) {stc += nx; dy -= 1.0;}
@@ -1008,6 +1034,7 @@ NavFn::calcPath(int n, int * st)
 float
 NavFn::gradCell(int n)
 {
+  // 检查这个 cell 是否计算过了
   if (gradx[n] + grady[n] > 0.0) {  // check this cell
     return 1.0;
   }
@@ -1021,6 +1048,7 @@ NavFn::gradCell(int n)
   float dy = 0.0;
 
   // check for in an obstacle
+  // 这里检测障碍物, 如果有障碍, 那么梯度加速远离障碍物
   if (cv >= POT_HIGH) {
     if (potarr[n - 1] < POT_HIGH) {
       dx = -COST_OBS;
@@ -1033,6 +1061,8 @@ NavFn::gradCell(int n)
       dy = COST_OBS;
     }
   } else {  // not in an obstacle
+    // 如果不是障碍物计算 potential 的梯度
+    // 这里计算的是两边的梯度, 同样只有不是障碍物才参与计算
     // dx calc, average to sides
     if (potarr[n - 1] < POT_HIGH) {
       dx += potarr[n - 1] - cv;
@@ -1051,6 +1081,7 @@ NavFn::gradCell(int n)
   }
 
   // normalize
+  // 归一化梯度
   float norm = hypot(dx, dy);
   if (norm > 0) {
     norm = 1.0 / norm;
