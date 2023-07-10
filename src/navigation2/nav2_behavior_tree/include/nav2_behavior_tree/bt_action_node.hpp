@@ -29,6 +29,8 @@ namespace nav2_behavior_tree
 
 using namespace std::chrono_literals;  // NOLINT
 
+// 继承 BT::ActionNodeBase 重新实现成合适 ROS 的 BtActionNode
+// 这里带上了 ActionT 这是 ROS 中的 action 定义
 /**
  * @brief Abstract class representing an action based BT node
  * @tparam ActionT Type of action
@@ -239,6 +241,7 @@ public:
       }
 
       // 如果 future_goal_handle_ 不存在, 被重置了, 表示 goal_handle_ 拿到了, 服务响应了
+      // 如果结果拿到了, 那么就没必要再拿 feedback 走下面这些流程了
       // The following code corresponds to the "RUNNING" loop
       if (rclcpp::ok() && !goal_result_available_) {
         // 用户定义来处理反馈
@@ -275,6 +278,7 @@ public:
         // spin 等待拿结果
         // check if, after invoking spin_some(), we finally received the result
         if (!goal_result_available_) {
+          // 这里如果结果拿到了, 就不能返回 RUNNING 了
           // Yield this Action, returning RUNNING
           return BT::NodeStatus::RUNNING;
         }
@@ -374,7 +378,7 @@ protected:
   {
     // 最开始 result 不是 available 的
     goal_result_available_ = false;
-    // 模板编程, typename 告诉编译器后面的是一个类型而不是静态成员
+    // 模板编程, typename 告诉编译器后面的是一个类型而不是函数
     auto send_goal_options = typename rclcpp_action::Client<ActionT>::SendGoalOptions();
     // 定义结果回调
     send_goal_options.result_callback =
@@ -394,6 +398,7 @@ protected:
         // if matched, it must be processed (including aborted)
         if (this->goal_handle_->get_goal_id() == result.goal_id) {
           // 保存回调结果
+          // 处理完成, 拿到结果 goal_result_available_ 变成 true
           goal_result_available_ = true;
           result_ = result;
         }
@@ -453,6 +458,10 @@ protected:
       if (!goal_handle_) {
         throw std::runtime_error("Goal was rejected by the action server");
       }
+      // 这里返回 true 就是 future_goal_handle_ 中有东西了, 表示之前发送 goal 的服务成功了
+      // 服务端接收到了 goal 并给出了一个 goal_handle
+      // 这时候 goal_handle 就不是 future 的了, 接下来会将 future_goal_handle_ 重置
+      // 这里获取到的 goal_handle 会保存到 goal_handle_ 中
       return true;
     }
 
